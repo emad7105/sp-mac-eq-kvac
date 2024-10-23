@@ -90,4 +90,10 @@ mod spmaceq_mac_tests {
 
         assert_eq!(f_coeffs1, f_coeffs2);
     }
+
+    #[test]
+    fn test_key_gens() {
+        let keys = Kvac::gen_isk();
+        let public_params = Kvac::gen_public_params(&keys, 10);
+    }
 }
