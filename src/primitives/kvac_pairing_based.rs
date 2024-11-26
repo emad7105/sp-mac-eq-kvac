@@ -89,7 +89,7 @@ impl KvacPB {
         (isk, ipar)
     }
 
-    pub fn issue_cred(pp: &KvacPBPublicParams, S: &[ScalarField], isk: &KvacPBSecretKeys, ipar: &KvacPBPublicParams) -> PreCredential {
+    pub fn issue_cred(pp: &KvacPBPublicParams, S: &[ScalarField], isk: &KvacPBSecretKeys) -> PreCredential {
         // 1. parse isk
         // 2. Commit (S) --> C=(C1,C2)
         let C = Dvsc::commit(&pp.setup_pp_DVSC, &pp.ipar_DVSC, S);
@@ -113,7 +113,7 @@ impl KvacPB {
         }
     }
 
-    pub fn obtain_cred(pp: &KvacPBPublicParams, pre_cred: &PreCredential, S: &[ScalarField], ipar: &KvacPBPublicParams) -> Credential {
+    pub fn obtain_cred(pp: &KvacPBPublicParams, pre_cred: &PreCredential, S: &[ScalarField]) -> Credential {
         // 8 & 9: parsing
         // 10: Dvsc.commit(S) --> C
         let C = Dvsc::commit(&pp.setup_pp_DVSC, &pp.ipar_DVSC, &S);
@@ -126,7 +126,7 @@ impl KvacPB {
         }
     }
 
-    pub fn show_cred(pp: &KvacPBPublicParams, cred: Credential, S: &[ScalarField], D: &[ScalarField]) -> Show {
+    pub fn show_cred(pp: &KvacPBPublicParams, cred: &Credential, S: &[ScalarField], D: &[ScalarField]) -> Show {
         // 1. parsing
         // 2. miu <-- Zp
         let mut rng = ark_std::rand::thread_rng(); // todo
@@ -134,7 +134,7 @@ impl KvacPB {
 
         // 3. MEQ.ChangeRep(C, tau; miu)
         let msg: Vec<G1> = vec![cred.C.fs_evaluated_at_v_G.clone(), cred.C.G_prime.clone()];
-        let (C_vec, tau_prime) =  SpMacEq::change_representation(&cred.tau, &msg, &mut rng);
+        let (C_vec, tau_prime) =  SpMacEq::change_representation_with_rand(&cred.tau, &msg, &miu, &mut rng);
         let C1_prime = C_vec.get(0).expect("no C1 in commitment").clone();
         let C2_prime  = C_vec.get(1).expect("no C2 in commitment").clone();
         let C_prime = Commitment {
@@ -166,5 +166,54 @@ impl KvacPB {
         // 10. MEQ.verify(sk_MEQ, C_prime, tau_prime)
         let spmac_sks = vec![isk.sk_MEQ_x1, isk.sk_MEQ_x2];
         SpMacEq::verify(&spmac_sks, &show.tau_prime, &C_prime)
+    }
+}
+
+
+#[cfg(test)]
+mod spmaceq_mac_tests {
+    use crate::primitives::kvac_pairing_based::KvacPB;
+    use crate::primitives::kvac_pairing_based::ScalarField;
+    use ark_std::UniformRand;
+
+    #[test]
+    fn test_kvac_pb_full_flow_test() {
+        // 0. setup
+        // attribute sets
+        let S = prepare_set_S(20);
+        let D: Vec<ScalarField> = S.iter().take(8).cloned().collect();
+        let (isk, pp) = KvacPB::key_gen(40);
+
+        // 1. issue cred
+        let pre_cred = KvacPB::issue_cred(&pp, &S, &isk);
+
+        // 2. obtain cred
+        let cred = KvacPB::obtain_cred(&pp, &pre_cred, &S);
+
+        // 3. show cred
+        let show = KvacPB::show_cred(&pp, &cred, &S, &D);
+
+        // 5. verify
+        let result = KvacPB::verify(&pp, &show, &D, &isk);
+
+        assert_eq!(result, true)
+    }
+
+    // this prepares a random set S of attributes for testing purposes
+    fn prepare_set_S(size: usize) -> Vec<ScalarField> {
+        let mut rng = ark_std::rand::thread_rng();
+        let mut S = vec![];
+        for i in 0..size {
+            let r = ScalarField::rand(&mut rng);
+            S.push(r);
+        }
+        S
+    }
+
+    // for calculating f_{S\D}
+    fn pick_subset_excluding_first(S: Vec<ScalarField>, D: usize) -> Vec<ScalarField> {
+        // Take the subset excluding the first D elements
+        let subset = &S[D..];
+        subset.into()
     }
 }
