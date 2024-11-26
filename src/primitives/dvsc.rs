@@ -12,6 +12,7 @@ use ark_std::iterable::Iterable;
 use std::collections::HashSet;
 use crate::primitives::kvac_pairing_less::KvacPL;
 use crate::primitives::spmac_bls12_381::SpMacEq;
+use std::ops::Add;
 
 
 
@@ -20,13 +21,13 @@ pub struct Dvsc {}
 
 pub struct PoK {}
 
-pub struct SetupParams {
+pub struct DvscSetupParams {
     G: G1,
     G_prime: G1,
 }
 
 pub struct DvscSk {
-    sk: ScalarField
+    pub sk: ScalarField
 }
 
 pub struct DvscPublicParam {
@@ -35,23 +36,23 @@ pub struct DvscPublicParam {
 }
 
 pub struct Commitment {
-    fs_evaluated_at_v_G: G1,
-    G_prime: G1,
+    pub fs_evaluated_at_v_G: G1,
+    pub G_prime: G1,
 }
 
 impl Dvsc{
 
-    pub fn setup() -> SetupParams{
+    pub fn setup() -> DvscSetupParams {
         let G = G1::generator();
 
         let mut rng = ark_std::rand::thread_rng(); // todo
         let r = ScalarField::rand(&mut rng);
         let G_prime = G.mul(r);
 
-        SetupParams{G, G_prime}
+        DvscSetupParams {G, G_prime}
     }
 
-    pub fn key_gen(pp: &SetupParams, t: usize) -> (DvscSk, DvscPublicParam){
+    pub fn key_gen(pp: &DvscSetupParams, t: usize) -> (DvscSk, DvscPublicParam){
         let G = &pp.G;
         // v <-- Zp
         let mut rng = ark_std::rand::thread_rng(); // todo
@@ -89,10 +90,10 @@ impl Dvsc{
 
     pub fn evaluate_f_at_secret_point(f_coeffs: &[ScalarField], Yj: &[G1]) -> G1 {
         let mut eval = G1::zero();
-        for i in 1..f_coeffs.len() {
-            let f_coeff: &ScalarField = f_coeffs.get(i).expect("missing coeff");
-            let Y_j: &G1 = Yj.get(i.clone() - 1).expect("missing Yj");
-            eval.add_assign(Y_j.mul(f_coeff));
+        for j in 0..f_coeffs.len() {
+            let Y_j: &G1 = Yj.get(j).expect("missing Yj");
+            let f_coeff: &ScalarField = f_coeffs.get(j).expect("missing coeff");
+            eval = eval.add(&Y_j.mul(*f_coeff));
         }
         eval
     }
@@ -105,7 +106,7 @@ impl Dvsc{
     }
 
 
-    pub fn commit(pp: &SetupParams, ipar: &DvscPublicParam, S: &[ScalarField]) -> Commitment {
+    pub fn commit(pp: &DvscSetupParams, ipar: &DvscPublicParam, S: &[ScalarField]) -> Commitment {
         let f = Dvsc::construct_f(&S);
         let f_evaluated_at_v = Dvsc::evaluate_f_at_secret_point(&f.coeffs, &ipar.Vj);
 
@@ -117,7 +118,7 @@ impl Dvsc{
         }
     }
 
-    pub fn randomize(pp: &SetupParams, ipar: &DvscPublicParam, C: &Commitment, miu: &ScalarField) -> Commitment {
+    pub fn randomize(pp: &DvscSetupParams, ipar: &DvscPublicParam, C: &Commitment, miu: &ScalarField) -> Commitment {
         let C1 = C.fs_evaluated_at_v_G.mul(miu);
         let C2 = C.G_prime.mul(miu);
 
@@ -127,7 +128,7 @@ impl Dvsc{
         }
     }
 
-    pub fn open_subset(pp: &SetupParams, ipar: &DvscPublicParam, miu: &ScalarField, S: &[ScalarField], D: &[ScalarField]) -> Commitment {
+    pub fn open_subset(pp: &DvscSetupParams, ipar: &DvscPublicParam, miu: &ScalarField, S: &[ScalarField], D: &[ScalarField]) -> Commitment {
         let S_bar_D = Dvsc::difference(&S, &D);
 
         let f_S_bar_D = Dvsc::construct_f(&S_bar_D);
@@ -142,7 +143,7 @@ impl Dvsc{
     }
 
 
-    pub fn verify_subset(pp: &SetupParams, ipar: &DvscPublicParam, sk: &DvscSk, C_prime: &Commitment, W: &Commitment, D: &[ScalarField]) -> bool {
+    pub fn verify_subset(pp: &DvscSetupParams, ipar: &DvscPublicParam, sk: &DvscSk, C_prime: &Commitment, W: &Commitment, D: &[ScalarField]) -> bool {
         let f_D = Dvsc::construct_f(&D);
         let f_D_evaluated_at_v = f_D.evaluate(&sk.sk);
 
@@ -155,15 +156,23 @@ impl Dvsc{
 
 #[cfg(test)]
 mod Dvsc_tests {
+    use std::ops::{Add, Mul};
     use crate::primitives::dvsc::Dvsc;
     use crate::primitives::dvsc::ScalarField;
+    use crate::primitives::dvsc::G1;
     use ark_std::UniformRand;
+    use ark_poly::Polynomial;
+    use ark_ec::Group;
+    use ark_ff::Field;
+    use ark_poly::univariate::DensePolynomial;
+    use ark_poly::DenseUVPolynomial;
+    use ark_std::Zero;
 
     #[test]
     fn dvsc_full() {
         // setup + keygen
         let pp = Dvsc::setup();
-        let (sk, ipar) = Dvsc::key_gen(&pp, 20);
+        let (sk, ipar) = Dvsc::key_gen(&pp, 40);
 
         // S & D
         let S = prepare_set_S(20);
@@ -186,6 +195,79 @@ mod Dvsc_tests {
         assert_eq!(result, true);
     }
 
+    #[test]
+    pub fn test_subsets() {
+        let S = prepare_set_S(20);
+        let D = pick_subset_excluding_first(&S, 8);
+
+        let f_S = Dvsc::construct_f(&S);
+        let f_D = Dvsc::construct_f(&D);
+
+        let f_S_not_D = &f_S / &f_D;
+
+        let f_new_S = f_S_not_D.naive_mul(&f_D);
+
+        assert_eq!(f_new_S.coeffs, f_S.coeffs);
+    }
+
+    #[test]
+    pub fn test_eval_at_secret_point() {
+        let S = prepare_set_S(20);
+
+        // secret point v
+        let setup_pp = Dvsc::setup();
+        let (sk,pp) = Dvsc::key_gen(&setup_pp, 50);
+        let v = sk.sk;
+
+        // f_S(x)
+        let f_S = Dvsc::construct_f(&S);
+
+        // normal evaluation f_S(v)
+        let normal_evaluation_fv = f_S.evaluate(&v);
+        let generator = G1::generator();
+        let normal_evaluation_fvG = generator.mul(normal_evaluation_fv);
+
+        let secret_evaluation_fvG = Dvsc::evaluate_f_at_secret_point(&f_S.coeffs, &pp.Vj);
+
+        assert!(normal_evaluation_fvG.eq(&secret_evaluation_fvG));
+    }
+
+    #[test]
+    fn test_Vjs() {
+        // f(x) = 3 + 2x + 5x^2
+        // f(11) = 630
+        let f = DensePolynomial::from_coefficients_slice(&[
+            ScalarField::from(3),
+            ScalarField::from(2),
+            ScalarField::from(5)
+        ]);
+        let v = ScalarField::from(11);
+        let f_11 = f.evaluate(&v);
+        println!("f(v)=f(11): {:?}", f_11);
+        let G = G1::generator();
+        let f_11G = G.mul(f_11);
+
+        let mut Vjs = vec![];
+        for j in 0..3 {
+            let v_power_j = v.pow([j as u64]);
+            let v_power_j_G = G.mul(v_power_j);
+            Vjs.push(v_power_j_G)
+        }
+
+        // evaluate
+        let mut resultG = G1::zero();
+        for j in 0..3 {
+            let Vj: &G1 = Vjs.get(j).expect("no vj found");
+            let coeff_j = f.coeffs.get(j).expect("no coeff found");
+
+            resultG = resultG.add(&Vj.mul(*coeff_j));
+        }
+
+        println!("f(v)=f(11)G evaluated at secret point: {:?}", resultG);
+        // assert_eq!(result, f_11);
+        assert_eq!(resultG.eq(&f_11G), true);
+
+    }
 
     // this prepares a random set S of attributes for testing purposes
     fn prepare_set_S(size: usize) -> Vec<ScalarField> {

@@ -62,7 +62,7 @@ impl KvacPL {
         }
     }
 
-    pub fn gen_public_params(isk: &SecretKeys, t: usize) -> PublicParams {
+    pub fn gen_public_params(isk: &SecretKeys) -> PublicParams {
         let mut rng = ark_std::rand::thread_rng();
         let r = ScalarField::rand(&mut rng);
         let G = G1::generator();
@@ -107,7 +107,7 @@ impl KvacPL {
         let tau = C.mul(&isk.x);
         // (Y_j = y*V_jG) for j in [|S|]
         let mut Yj = vec![];
-        for j in 0..S.len() {
+        for j in 0..(S.len()+1) {
             let v_power_j = isk.v.pow([j as u64]);
             let yvj: Fp256<MontBackend<FrConfig, 4>> = v_power_j * y.clone();
             let yvjG = G.mul(yvj);
@@ -195,7 +195,7 @@ mod spmaceq_mac_tests {
     fn test_kvac_full_flow_test() {
         // 0. key gens
         let isk = KvacPL::gen_isk();
-        let pp = KvacPL::gen_public_params(&isk, 20);
+        let pp = KvacPL::gen_public_params(&isk);
 
         // attribute sets
         let S = prepare_set_S(20);
@@ -230,13 +230,13 @@ mod spmaceq_mac_tests {
     #[test]
     fn test_key_gens() {
         let keys = KvacPL::gen_isk();
-        let public_params = KvacPL::gen_public_params(&keys, 10);
+        let public_params = KvacPL::gen_public_params(&keys);
     }
 
     #[test]
     fn test_evaluations() {
         let secret_keys = KvacPL::gen_isk();
-        let public_params = KvacPL::gen_public_params(&secret_keys, 20);
+        let public_params = KvacPL::gen_public_params(&secret_keys);
 
         let S = prepare_set_S(20);
 
@@ -260,7 +260,7 @@ mod spmaceq_mac_tests {
     #[test]
     fn test_Kvac_flow() {
         let secret_keys = KvacPL::gen_isk();
-        let public_params = KvacPL::gen_public_params(&secret_keys, 20);
+        let public_params = KvacPL::gen_public_params(&secret_keys);
 
         let S = prepare_set_S(20);
 

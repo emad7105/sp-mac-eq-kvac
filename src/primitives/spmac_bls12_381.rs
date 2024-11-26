@@ -9,7 +9,7 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::{CryptoRng, Rng};
 
 
-#[derive(Debug,PartialEq)]
+#[derive(Debug,PartialEq, Clone)]
 pub struct SpMacEq {
     /// R point
     pub R: G1,
@@ -106,6 +106,14 @@ impl SpMacEq {
         // let mut rng = ark_std::rand::thread_rng(); // todo
 
         let a = ScalarField::rand(rng);
+        // zero checking
+
+        SpMacEq::mac_with_a(sk, messages, &a)
+    }
+
+    pub fn mac_with_a(sk: &[ScalarField], messages: &[G1], a: &ScalarField) -> SpMacEq {
+        // let mut rng = ark_std::rand::thread_rng(); // todo
+
         // zero checking
 
         let mut R:G1 = G1::zero();
