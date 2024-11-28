@@ -1,8 +1,8 @@
 use ark_bls12_381::{Fr as ScalarField, G1Projective as G1, G2Projective as G2, Bls12_381, G1Projective, Fr, FrConfig};
-use std::ops::{AddAssign, Mul};
+use std::ops::{AddAssign, Mul, Sub};
 use ark_ec::pairing::Pairing;
-use ark_ec::Group;
-use ark_ff::{Field, Fp, Fp256, MontBackend};
+use ark_ec::{CurveGroup, Group};
+use ark_ff::{BigInteger, Field, Fp, Fp256, MontBackend, PrimeField};
 use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial, Polynomial};
 use rand::{CryptoRng, Rng};
 use ark_std::{UniformRand, Zero};
@@ -10,7 +10,10 @@ use ark_std::One;
 use std::ops::Neg;
 use ark_std::iterable::Iterable;
 use std::collections::HashSet;
+use ark_serialize::CanonicalSerialize;
+use sha2::Sha256;
 use crate::primitives::dvsc::Dvsc;
+use sha2::Digest;
 
 
 pub struct KvacPL {}
@@ -41,7 +44,16 @@ pub struct Credential {
     Yj: Vec<G1>,
 }
 
-pub struct PoK {}
+pub struct Witness {
+    x: ScalarField,
+    v: ScalarField
+}
+
+pub struct PoK {
+    c: ScalarField,
+    s_x: ScalarField,
+    s_v: ScalarField,
+}
 
 pub struct Show {
     tau_prime: G1,
@@ -114,22 +126,28 @@ impl KvacPL {
             Yj.push(yvjG);
         }
 
-        // todo: PoK
+        let witness = Witness{
+            x: isk.x.clone(),
+            v: isk.v.clone(),
+        };
+        let pok = KvacPL::pok(&witness, &C, &pp.R, &pp.X, &Yj, &S, &tau, &pp.V);
 
         PreCredential {
             tau,
             Yj,
-            pok: PoK {},
+            pok: pok,
         }
     }
 
-    pub fn obtain_cred(pp: &PublicParams, pre_cred: &PreCredential, pok: &PoK, S: &[ScalarField]) -> Credential {
+    pub fn obtain_cred(pp: &PublicParams, pre_cred: &PreCredential, S: &[ScalarField]) -> Credential {
         // C <-- y * f_S(v) G
         let f = Dvsc::construct_f(&S);
         let C_recalculated = Dvsc::evaluate_f_at_secret_point(&f.coeffs, &pre_cred.Yj);
 
         // Check PoK
-        // todo
+        let result = KvacPL::pok_verify(&pre_cred.pok, &pp.V, &C_recalculated, &pp.R, &pp.X, &pre_cred.Yj, &S, &pre_cred.tau);
+        assert!(result);
+        // println!("PoK result: {:?}", result);
 
         Credential {
             C: C_recalculated,
@@ -175,6 +193,98 @@ impl KvacPL {
         // (xWf_D(v) == tau_prime) && (tau_prime != 0G)
         xWf_D_evaluated_at_v.eq(&show.tau_prime) && (!show.tau_prime.eq(&G1::zero()))
     }
+
+    pub fn pok (witness: &Witness, C: &G1, R: &G1, X:&G1, Yi: &[G1], S: &[ScalarField], tau: &G1, V: &G1) -> PoK{
+        let mut rng = ark_std::rand::thread_rng();
+        let r_x = ScalarField::rand(&mut rng);
+        let r_v = ScalarField::rand(&mut rng);
+
+        let s_size = S.len();
+
+        let a1 = C.mul(&r_x);
+        let a2 = R.mul(&r_x);
+        let mut ai = vec![];
+        for i in 0..(s_size-1) {
+            let a = Yi.get(i).expect("Yi missing").mul(&r_v);
+            ai.push(a);
+        }
+
+        let mut hash_input_points = vec![*V,*C,*X,*R, a1, a2, *tau];
+        hash_input_points.append(&mut ai);
+        let mut Yj = (&Yi[0..s_size]).to_vec();
+        hash_input_points.append(&mut Yj);
+
+        let c = KvacPL::hash_to_fr(&hash_input_points, &S);
+
+        let s_x = &r_x + &((&c)*(&witness.x));
+        let s_v = &r_v + &((&c)*(&witness.v));
+
+        PoK{
+            c: c,
+            s_x: s_x,
+            s_v: s_v
+        }
+    }
+
+    pub fn pok_verify(pok: &PoK, V: &G1, C: &G1, R: &G1, X: &G1, Yj: &[G1], S: &[ScalarField], tau: &G1) -> bool {
+        let a1 = C.mul(&pok.s_x).sub(&tau.mul(&pok.c));
+        let a2 = R.mul(&pok.s_x).sub(&X.mul(&pok.c));
+
+        let s_size = S.len();
+
+        let mut a_i = vec![];
+        for i in 0..(s_size-1) {
+            let svYj = Yj.get(i).expect("missing Yj").mul(&pok.s_v);
+            let cYjplus1 = Yj.get(&i+1).expect("missing Yj+1").mul(&pok.c);
+            let aj = svYj.sub(cYjplus1);
+            a_i.push(aj);
+        }
+
+        let mut hash_input_points = vec![*V,*C,*X,*R, a1, a2, *tau];
+        hash_input_points.append(&mut a_i);
+        let mut Yj_s_slice = (&Yj[0..s_size]).to_vec();
+        hash_input_points.append(&mut Yj_s_slice);
+
+        let c_verifier = KvacPL::hash_to_fr(&hash_input_points, &S);
+
+        pok.c == c_verifier
+    }
+
+    pub fn hash_to_fr(points: &[G1Projective], scalar_fields: &[ScalarField]) -> Fr {
+        let mut hasher = Sha256::new();
+
+        // Serialize each point and feed it to the hash
+        for point in points {
+            // Convert to affine coordinates
+            let affine = point.into_affine();
+
+            // Serialize the affine point
+            let mut serialized = Vec::new();
+            affine.serialize_uncompressed(&mut serialized).unwrap();
+
+            // Update the hash with the serialized data
+            hasher.update(serialized);
+        }
+
+        // Serialize each scalar field element and feed it to the hash
+        for scalar in scalar_fields {
+            // Convert scalar to its big integer representation and then to bytes
+            let scalar_bigint = scalar.into_bigint(); // Use `into_bigint` for Arkworks Scalars
+            let scalar_bytes = scalar_bigint.to_bytes_le();
+
+            // Update the hash with the scalar bytes
+            hasher.update(scalar_bytes);
+        }
+
+        // Finalize the hash
+        let hash_bytes = hasher.finalize();
+
+        // Convert hash bytes to a scalar field element
+        // Interpret the hash as a big integer and reduce modulo the field order
+        let hash_bigint = Fr::from_le_bytes_mod_order(&hash_bytes);
+
+        hash_bigint
+    }
 }
 
 
@@ -205,7 +315,7 @@ mod spmaceq_mac_tests {
         let pre_cred = KvacPL::issue_cred(&pp, &S, &isk);
 
         // 2. KVAC.obtain_cred(pp, PreCred, S, ipar)
-        let cred = KvacPL::obtain_cred(&pp, &pre_cred, &pre_cred.pok, &S);
+        let cred = KvacPL::obtain_cred(&pp, &pre_cred, &S);
 
         // 3. KVAC.show_cred(pp, Cred, S, D)
         let show = KvacPL::show_cred(&pp, &cred, &S, &D);
@@ -265,7 +375,7 @@ mod spmaceq_mac_tests {
         let S = prepare_set_S(20);
 
         let pre_cred = KvacPL::issue_cred(&public_params, &S, &secret_keys);
-        let credential = KvacPL::obtain_cred(&public_params, &pre_cred, &pre_cred.pok, &S);
+        let credential = KvacPL::obtain_cred(&public_params, &pre_cred, &S);
     }
 
     // this prepares a random set S of attributes for testing purposes
