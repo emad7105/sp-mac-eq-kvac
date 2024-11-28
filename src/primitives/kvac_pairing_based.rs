@@ -1,8 +1,8 @@
-use ark_bls12_381::{Fr as ScalarField, G1Projective as G1, G2Projective as G2, Bls12_381, G1Projective, Fr, FrConfig};
-use std::ops::{AddAssign, Mul};
+use ark_bls12_381::{Fr as ScalarField, G1Projective as G1, G2Projective as G2, Bls12_381, G1Projective, G2Projective, Fr, FrConfig};
+use std::ops::{Add, AddAssign, Mul, Sub};
 use ark_ec::pairing::Pairing;
-use ark_ec::Group;
-use ark_ff::{Field, Fp, Fp256, MontBackend};
+use ark_ec::{CurveGroup, Group};
+use ark_ff::{BigInteger, Field, Fp, Fp256, MontBackend, PrimeField};
 use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial, Polynomial};
 use rand::{CryptoRng, Rng};
 use ark_std::{UniformRand, Zero};
@@ -10,6 +10,9 @@ use ark_std::One;
 use std::ops::Neg;
 use ark_std::iterable::Iterable;
 use std::collections::HashSet;
+use std::future::poll_fn;
+use ark_serialize::CanonicalSerialize;
+use sha2::{Sha256,Digest};
 use crate::primitives::dvsc;
 use crate::primitives::dvsc::{Commitment, Dvsc, DvscPublicParam, DvscSetupParams, DvscSk};
 use crate::primitives::spmac_bls12_381::SpMacEq;
@@ -25,16 +28,25 @@ pub struct KvacPBSecretKeys {
 }
 
 pub struct KvacPBPublicParams {
-    sk_MEQ_I: G1,
-    sk_MEQ_X1: G1,
-    sk_MEQ_X2: G1,
+    ipar_MEQ_I: G1,
+    ipar_MEQ_X1: G1,
+    ipar_MEQ_X2: G1,
 
     setup_pp_DVSC: DvscSetupParams,
     ipar_DVSC: DvscPublicParam,
 }
 
-pub struct PoK {
+pub struct Witness {
+    a_minus_1: ScalarField,
+    x1: ScalarField,
+    x2: ScalarField
+}
 
+pub struct PoK {
+    c: ScalarField,
+    s_a_minus_1: ScalarField,
+    s_x1: ScalarField,
+    s_x2: ScalarField,
 }
 
 pub struct PreCredential {
@@ -78,9 +90,9 @@ impl KvacPB {
         };
 
         let ipar = KvacPBPublicParams {
-            sk_MEQ_I: I,
-            sk_MEQ_X1: X1,
-            sk_MEQ_X2: X2,
+            ipar_MEQ_I: I,
+            ipar_MEQ_X1: X1,
+            ipar_MEQ_X2: X2,
 
             setup_pp_DVSC: dvsc_setup_pp,
             ipar_DVSC: dvsc_ipar_pp
@@ -104,7 +116,14 @@ impl KvacPB {
         let tau = SpMacEq::mac_with_a(&sk_meq, &msg_to_mac, &a);
 
         // 5. PoK todo
-        let pok = PoK {};
+        let witness = Witness {
+            x1: isk.sk_MEQ_x1.clone(),
+            x2: isk.sk_MEQ_x2.clone(),
+            a_minus_1: a.inverse().expect("inverse a failed"),
+        };
+
+        let pok = KvacPB::pok(&witness, &S, &pp.ipar_MEQ_X1, &pp.ipar_MEQ_X2,
+                              &tau.R, &tau.T, &pp.ipar_MEQ_I, &C.fs_evaluated_at_v_G, &C.G_prime);
 
         // 6. PreCred := (tau, pok)
         PreCredential {
@@ -118,7 +137,11 @@ impl KvacPB {
         // 10: Dvsc.commit(S) --> C
         let C = Dvsc::commit(&pp.setup_pp_DVSC, &pp.ipar_DVSC, &S);
 
-        // 11: Pok checking todo
+        // 11: Pok checking
+        let result = KvacPB::pok_verify(&pre_cred.pok, &S, &pp.ipar_MEQ_X1, &pp.ipar_MEQ_X2,
+                           &pre_cred.tau.R, &pre_cred.tau.T, &pp.ipar_MEQ_I, &C.fs_evaluated_at_v_G, &C.G_prime);
+        assert!(result);
+        //println!("PoK result: {:?}", result);
 
         Credential {
             C,
@@ -167,14 +190,113 @@ impl KvacPB {
         let spmac_sks = vec![isk.sk_MEQ_x1, isk.sk_MEQ_x2];
         SpMacEq::verify(&spmac_sks, &show.tau_prime, &C_prime)
     }
+
+    pub fn pok(witness: &Witness, S: &[ScalarField], X1: &G1, X2: &G1, R: &G1, T: &G2, I: &G1, C1:&G1, C2:&G1 ) -> PoK {
+        let mut rng = ark_std::rand::thread_rng(); // todo
+        let r_a_minus_one = ScalarField::rand(&mut rng);
+        let r_x1 = ScalarField::rand(&mut rng);
+        let r_x2 = ScalarField::rand(&mut rng);
+
+        let a1 = I.mul(&r_x1);
+        let a2 = I.mul(&r_x2);
+        let a3 = G2::generator().mul(&r_a_minus_one);
+        let rx1C1 = C1.mul(&r_x1);
+        let rx2C2 = C2.mul(&r_x2);
+        let ra1R = R.mul(r_a_minus_one);
+        let rx1C1_plus_rx2C2 = rx1C1.add(rx2C2);
+        let a4 = rx1C1_plus_rx2C2.sub(ra1R);
+
+        let hash_input_points_G1 = vec![a1, a2, a4, *X1, *X2, *I, *C1, *C2, *R];
+        let hash_input_points_G2 = vec![a3, *T];
+        let c = KvacPB::hash_to_fr(&hash_input_points_G1, &S,  &hash_input_points_G2);
+
+        let s_a_minus_1 = &r_a_minus_one + &((&c)*(&witness.a_minus_1));
+        let s_x1 = &r_x1 + &((&c)*(&witness.x1));
+        let s_x2 = &r_x2 + &((&c)*(&witness.x2));
+
+        PoK{
+            c: c,
+            s_a_minus_1: s_a_minus_1,
+            s_x1: s_x1,
+            s_x2: s_x2,
+        }
+    }
+
+    pub fn pok_verify(pok: &PoK, S: &[ScalarField], X1: &G1, X2: &G1, R: &G1, T: &G2, I: &G1, C1:&G1, C2:&G1 ) -> bool {
+        let a1 = I.mul(&pok.s_x1).sub(&X1.mul(&pok.c));
+        let a2 = I.mul(&pok.s_x2).sub(&X2.mul(&pok.c));
+        let a3 = G2::generator().mul(&pok.s_a_minus_1).sub(&T.mul(&pok.c));
+        let a4 = C1.mul(&pok.s_x1).add(&C2.mul(&pok.s_x2)).sub(&R.mul(&pok.s_a_minus_1));
+
+        let hash_input_points_G1 = vec![a1, a2, a4, *X1, *X2, *I, *C1, *C2, *R];
+        let hash_input_points_G2 = vec![a3, *T];
+        let c_verifier = KvacPB::hash_to_fr(&hash_input_points_G1, &S, &hash_input_points_G2);
+
+        pok.c == c_verifier
+    }
+
+    /// Hashes a vector of `G1Projective` points into a scalar field element of type `Fr`
+    pub fn hash_to_fr(points_G1: &[G1Projective], scalar_fields: &[ScalarField], points_G2: &[G2Projective]) -> Fr {
+        let mut hasher = Sha256::new();
+
+        // Serialize each point and feed it to the hash
+        for point in points_G1 {
+            // Convert to affine coordinates
+            let affine = point.into_affine();
+
+            // Serialize the affine point
+            let mut serialized = Vec::new();
+            affine.serialize_uncompressed(&mut serialized).unwrap();
+
+            // Update the hash with the serialized data
+            hasher.update(serialized);
+        }
+
+        // Serialize each point and feed it to the hash
+        for point in points_G2 {
+            // Convert to affine coordinates
+            let affine = point.into_affine();
+
+            // Serialize the affine point
+            let mut serialized = Vec::new();
+            affine.serialize_uncompressed(&mut serialized).unwrap();
+
+            // Update the hash with the serialized data
+            hasher.update(serialized);
+        }
+
+        // Serialize each scalar field element and feed it to the hash
+        for scalar in scalar_fields {
+            // Convert scalar to its big integer representation and then to bytes
+            let scalar_bigint = scalar.into_bigint(); // Use `into_bigint` for Arkworks Scalars
+            let scalar_bytes = scalar_bigint.to_bytes_le();
+
+            // Update the hash with the scalar bytes
+            hasher.update(scalar_bytes);
+        }
+
+        // Finalize the hash
+        let hash_bytes = hasher.finalize();
+
+        // Convert hash bytes to a scalar field element
+        // Interpret the hash as a big integer and reduce modulo the field order
+        let hash_bigint = Fr::from_le_bytes_mod_order(&hash_bytes);
+
+        hash_bigint
+    }
 }
 
 
 #[cfg(test)]
 mod spmaceq_mac_tests {
+    use std::ops::Mul;
+    use ark_ec::hashing::map_to_curve_hasher::MapToCurveBasedHasher;
     use crate::primitives::kvac_pairing_based::KvacPB;
-    use crate::primitives::kvac_pairing_based::ScalarField;
     use ark_std::UniformRand;
+    use ark_bls12_381::{Fr as ScalarField, G1Projective as G1, G2Projective as G2, Bls12_381, G1Projective, Fr, FrConfig};
+    use ark_ec::Group;
+    use sha2::Sha256;
+    use sha2::Digest;
 
     #[test]
     fn test_kvac_pb_full_flow_test() {
@@ -197,6 +319,26 @@ mod spmaceq_mac_tests {
         let result = KvacPB::verify(&pp, &show, &D, &isk);
 
         assert_eq!(result, true)
+    }
+
+    #[test]
+    fn hash_to_field() {
+        let mut rng = ark_std::rand::thread_rng(); // todo
+        let r = ScalarField::rand(&mut rng);
+
+        let G = G1::generator();
+        let A = G.mul(&r);
+        let B = A.mul(&r);
+        let C = B.mul(&r);
+        let points = vec![A,B,C];
+
+        let scalar_fields_G1 = vec![r, r, r];
+        let scalar_fields_G2 = vec![G2::generator(), G2::generator()];
+
+
+        let scalar_field_hash = KvacPB::hash_to_fr(&points, &scalar_fields_G1, &scalar_fields_G2);
+
+        let D = C.mul(&scalar_field_hash);
     }
 
     // this prepares a random set S of attributes for testing purposes
