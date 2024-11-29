@@ -1,4 +1,2 @@
-mod verifier;
-mod user;
-mod issuer;
-mod primitives;
+pub mod primitives;
+pub mod benchmark;

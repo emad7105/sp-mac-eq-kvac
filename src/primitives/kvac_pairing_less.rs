@@ -285,6 +285,83 @@ impl KvacPL {
 
         hash_bigint
     }
+
+    pub fn size_of_pre_cred(pre_cred: &PreCredential) -> usize {
+        let mut buffer = Vec::new();
+
+        // Serialize `tau` and get its size
+        pre_cred.tau.serialize_compressed(&mut buffer).unwrap();
+        let size_tau = buffer.len();
+        buffer.clear();
+
+        // Serialize each element in `Yj` and sum their sizes
+        let size_yj: usize = pre_cred.Yj.iter().map(|y| {
+            y.serialize_compressed(&mut buffer).unwrap();
+            let size = buffer.len();
+            buffer.clear();
+            size
+        }).sum();
+
+        // Serialize `PoK` fields and sum their sizes
+        pre_cred.pok.c.serialize_compressed(&mut buffer).unwrap();
+        let size_c = buffer.len();
+        buffer.clear();
+
+        pre_cred.pok.s_x.serialize_compressed(&mut buffer).unwrap();
+        let size_s_x = buffer.len();
+        buffer.clear();
+
+        pre_cred.pok.s_v.serialize_compressed(&mut buffer).unwrap();
+        let size_s_v = buffer.len();
+        buffer.clear();
+
+        // Total size is the sum of all parts
+        size_tau + size_yj + size_c + size_s_x + size_s_v
+    }
+
+    pub fn size_of_credential(credential: &Credential) -> usize {
+        let mut buffer = Vec::new();
+
+        // Serialize `C` and get its size
+        credential.C.serialize_compressed(&mut buffer).unwrap();
+        let size_c = buffer.len();
+        buffer.clear();
+
+        // Serialize `tau` and get its size
+        credential.tau.serialize_compressed(&mut buffer).unwrap();
+        let size_tau = buffer.len();
+        buffer.clear();
+
+        // Serialize each element in `Yj` and sum their sizes
+        let size_yj: usize = credential.Yj.iter().map(|y| {
+            y.serialize_compressed(&mut buffer).unwrap();
+            let size = buffer.len();
+            buffer.clear();
+            size
+        }).sum();
+
+        // Total size is the sum of all parts
+        size_c + size_tau + size_yj
+    }
+
+
+    pub fn size_of_show(show: &Show) -> usize {
+        let mut buffer = Vec::new();
+
+        // Serialize `tau_prime` and get its size
+        show.tau_prime.serialize_compressed(&mut buffer).unwrap();
+        let size_tau_prime = buffer.len();
+        buffer.clear();
+
+        // Serialize `W` and get its size
+        show.W.serialize_compressed(&mut buffer).unwrap();
+        let size_w = buffer.len();
+        buffer.clear();
+
+        // Total size is the sum of all parts
+        size_tau_prime + size_w
+    }
+
 }
 
 

@@ -4,16 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "issuer"
-path = "bin/issuer.rs"
-
-[[bin]]
-name = "user"
-path = "bin/user.rs"
-
-[[bin]]
-name = "verifier"
-path = "bin/verifier.rs"
+name = "benchmark"
+path = "bin/benchmark.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
