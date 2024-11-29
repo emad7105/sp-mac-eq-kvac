@@ -1,8 +1,8 @@
 use ark_bls12_381::{Fr as ScalarField, G1Projective as G1, G2Projective as G2, Bls12_381, G1Projective, Fr, FrConfig};
-use std::ops::{AddAssign, Mul};
+use std::ops::{AddAssign, Mul, Sub};
 use ark_ec::pairing::Pairing;
-use ark_ec::Group;
-use ark_ff::{Field, Fp, Fp256, MontBackend};
+use ark_ec::{CurveGroup, Group};
+use ark_ff::{Field, Fp, Fp256, MontBackend, PrimeField};
 use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial, Polynomial};
 use rand::{CryptoRng, Rng};
 use ark_std::{UniformRand, Zero};
@@ -13,13 +13,20 @@ use std::collections::HashSet;
 use crate::primitives::kvac_pairing_less::KvacPL;
 use crate::primitives::spmac_bls12_381::SpMacEq;
 use std::ops::Add;
-
-
+use ark_serialize::CanonicalSerialize;
+use sha2::{Sha256,Digest};
 
 
 pub struct Dvsc {}
 
-pub struct PoK {}
+pub struct Witness {
+    v: ScalarField
+}
+
+pub struct PoK {
+    c: ScalarField,
+    s_v: ScalarField
+}
 
 pub struct DvscSetupParams {
     G: G1,
@@ -58,8 +65,6 @@ impl Dvsc{
         let mut rng = ark_std::rand::thread_rng(); // todo
         let v = ScalarField::rand(&mut rng);
 
-        // todo Pok
-        let pok = PoK{};
 
 
         // {v_j*G} for j in [0...t]
@@ -70,6 +75,8 @@ impl Dvsc{
             Vj.push(vjG);
         }
 
+        let witness = Witness {v};
+        let pok = Dvsc::pok(&witness, &Vj, t);
 
         (DvscSk{sk:v}, DvscPublicParam{ Vj, pok })
     }
@@ -98,6 +105,77 @@ impl Dvsc{
         eval
     }
 
+    pub fn pok(witness: &Witness, Vj: &[G1], t: usize) -> PoK {
+        let mut rng = rand::thread_rng();
+        let r_v = ScalarField::rand(&mut rng);
+
+        let mut ai = vec![];
+        for j in 0..(t-1) {
+            let rVj = Vj.get(j).expect("Missing Vj").mul(&r_v);
+            ai.push(rVj);
+        }
+
+        let  c = Dvsc::hash_to_fr(&Vj, &ai);
+        let s_v = &r_v + &((&c)*(&witness.v));
+
+        PoK {
+            s_v: s_v,
+            c: c,
+        }
+    }
+
+    pub fn pok_verify(pok: &PoK, Vj: &[G1], t: usize) -> bool {
+        let mut a = vec![];
+        for j in 0..(t-1) {
+            let sVj = Vj.get(j).expect("missing Vj").mul(&pok.s_v);
+            let cVj = Vj.get(j).expect("missing Vj").mul(&pok.c);
+            let ai = sVj.sub(cVj);
+            a.push(ai);
+        }
+
+        let c_verifier = Dvsc::hash_to_fr(&Vj, &a);
+
+        pok.c == c_verifier
+    }
+
+    pub fn hash_to_fr(Vj: &[G1Projective], a: &[G1Projective]) -> Fr {
+        let mut hasher = Sha256::new();
+
+        // Serialize each point and feed it to the hash
+        for v in Vj {
+            // Convert to affine coordinates
+            let affine = v.into_affine();
+
+            // Serialize the affine point
+            let mut serialized = Vec::new();
+            affine.serialize_uncompressed(&mut serialized).unwrap();
+
+            // Update the hash with the serialized data
+            hasher.update(serialized);
+        }
+
+        for ai in a {
+            // Convert to affine coordinates
+            let affine = ai.into_affine();
+
+            // Serialize the affine point
+            let mut serialized = Vec::new();
+            affine.serialize_uncompressed(&mut serialized).unwrap();
+
+            // Update the hash with the serialized data
+            hasher.update(serialized);
+        }
+
+        // Finalize the hash
+        let hash_bytes = hasher.finalize();
+
+        // Convert hash bytes to a scalar field element
+        // Interpret the hash as a big integer and reduce modulo the field order
+        let hash_bigint = Fr::from_le_bytes_mod_order(&hash_bytes);
+
+        hash_bigint
+    }
+
 
     /// to calcluate the vec that is S\D
     pub fn difference<S: Eq + std::hash::Hash + Clone>(s: &[S], d: &[S]) -> Vec<S> {
@@ -111,6 +189,9 @@ impl Dvsc{
         let f_evaluated_at_v = Dvsc::evaluate_f_at_secret_point(&f.coeffs, &ipar.Vj);
 
         // todo check Pok in ipar.pok
+        // proof verification is omitted from Benchmarks
+        //let result = Dvsc::pok_verify(&ipar.pok, &ipar.Vj, ipar.Vj.len());
+        //println!("PoK result: {:?}", result);
 
         Commitment {
             fs_evaluated_at_v_G: f_evaluated_at_v,
