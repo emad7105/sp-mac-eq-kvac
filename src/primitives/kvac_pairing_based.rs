@@ -55,7 +55,7 @@ pub struct PreCredential {
 }
 
 pub struct Credential {
-    C: Commitment,
+    // C: Commitment,
     tau: SpMacEq,
 }
 
@@ -144,7 +144,7 @@ impl KvacPB {
         //println!("PoK result: {:?}", result);
 
         Credential {
-            C,
+            // C,
             tau: pre_cred.tau.clone()
         }
     }
@@ -156,14 +156,15 @@ impl KvacPB {
         let miu = ScalarField::rand(&mut rng);
 
         // 3. MEQ.ChangeRep(C, tau; miu)
-        let msg: Vec<G1> = vec![cred.C.fs_evaluated_at_v_G.clone(), cred.C.G_prime.clone()];
-        let (C_vec, tau_prime) =  SpMacEq::change_representation_with_rand(&cred.tau, &msg, &miu, &mut rng);
-        let C1_prime = C_vec.get(0).expect("no C1 in commitment").clone();
-        let C2_prime  = C_vec.get(1).expect("no C2 in commitment").clone();
-        let C_prime = Commitment {
-            fs_evaluated_at_v_G: C1_prime,
-            G_prime: C2_prime,
-        };
+        // let msg: Vec<G1> = vec![cred.C.fs_evaluated_at_v_G.clone(), cred.C.G_prime.clone()];
+        // let msg: Vec<G1> = vec![];
+        let tau_prime =  SpMacEq::change_representation_with_rand(&cred.tau, &miu, &mut rng);
+        // let C1_prime = C_vec.get(0).expect("no C1 in commitment").clone();
+        // let C2_prime  = C_vec.get(1).expect("no C2 in commitment").clone();
+        // let C_prime = Commitment {
+        //     fs_evaluated_at_v_G: C1_prime,
+        //     G_prime: C2_prime,
+        // };
 
         // 4. DVSC.OpenSubset (miu, S, D) --> W
         let W = Dvsc::open_subset(&pp.setup_pp_DVSC, &pp.ipar_DVSC, &miu, &S, &D);
@@ -328,15 +329,15 @@ impl KvacPB {
         let mut buffer = Vec::new();
 
         // Serialize `Commitment` and its fields
-        credential.C.fs_evaluated_at_v_G.serialize_compressed(&mut buffer).unwrap();
-        let size_fs_evaluated = buffer.len();
-        buffer.clear();
+        // credential.C.fs_evaluated_at_v_G.serialize_compressed(&mut buffer).unwrap();
+        // let size_fs_evaluated = buffer.len();
+        // buffer.clear();
 
-        credential.C.G_prime.serialize_compressed(&mut buffer).unwrap();
-        let size_g_prime = buffer.len();
-        buffer.clear();
+        // credential.C.G_prime.serialize_compressed(&mut buffer).unwrap();
+        // let size_g_prime = buffer.len();
+        // buffer.clear();
 
-        let size_commitment = size_fs_evaluated + size_g_prime;
+        let size_commitment = 0;//size_fs_evaluated + size_g_prime;
 
         // Serialize `tau` (SpMacEq) and its fields
         credential.tau.R.serialize_compressed(&mut buffer).unwrap();

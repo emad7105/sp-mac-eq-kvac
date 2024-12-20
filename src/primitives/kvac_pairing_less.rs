@@ -39,7 +39,7 @@ pub struct PreCredential {
 
 
 pub struct Credential {
-    C: G1,
+    // C: G1,
     tau: G1,
     Yj: Vec<G1>,
 }
@@ -151,7 +151,7 @@ impl KvacPL {
         // println!("PoK result: {:?}", result);
 
         Credential {
-            C: C_recalculated,
+            // C: C_recalculated,
             tau: pre_cred.tau.clone(),
             Yj: pre_cred.Yj.to_vec(),
         }
@@ -329,9 +329,10 @@ impl KvacPL {
         let mut buffer = Vec::new();
 
         // Serialize `C` and get its size
-        credential.C.serialize_compressed(&mut buffer).unwrap();
-        let size_c = buffer.len();
-        buffer.clear();
+        // credential.C.serialize_compressed(&mut buffer).unwrap();
+        // let size_c = buffer.len();
+        // buffer.clear();
+        let size_c = 0;
 
         // Serialize `tau` and get its size
         credential.tau.serialize_compressed(&mut buffer).unwrap();

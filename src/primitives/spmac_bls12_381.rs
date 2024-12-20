@@ -142,13 +142,50 @@ impl SpMacEq {
         lhs1 == rhs1
     }
 
-    pub fn change_representation<R: Rng + CryptoRng>(mac: &SpMacEq, messages: &[G1], rng: &mut R) -> (Vec<G1>, SpMacEq) {
+    pub fn change_representation<R: Rng + CryptoRng>(mac: &SpMacEq, rng: &mut R) -> SpMacEq {
         // let mut rng = ark_std::rand::thread_rng(); // todo
         let r1 = ScalarField::rand(rng);
-        SpMacEq::change_representation_with_rand(mac, messages, &r1, rng)
+        SpMacEq::change_representation_with_rand(mac, &r1, rng)
     }
 
-    pub fn change_representation_with_rand<R: Rng + CryptoRng>(mac: &SpMacEq, messages: &[G1], r1: &ScalarField, rng: &mut R) -> (Vec<G1>, SpMacEq) {
+    pub fn change_representation_with_rand<R: Rng + CryptoRng>(mac: &SpMacEq, r1: &ScalarField, rng: &mut R) -> SpMacEq {
+        // let mut rng = ark_std::rand::thread_rng(); // todo
+        let r2 = ScalarField::rand(rng);
+
+        // randomize message
+        // let rnd_messages: Vec<G1> = messages
+        //     .to_owned()
+        //     .into_iter()
+        //     .map(|mut g| {
+        //         g *= r1;
+        //         g
+        //     })
+        //     .collect();
+
+        // randomize mac
+        let mut rnd_R:&G1 = &mac.R.mul(r1);
+        //rnd_R = &rnd_R.mul(&r2);
+        let binding = rnd_R.mul(&r2);
+        rnd_R = &binding;
+
+        let inverse_r2 = r2.inverse().expect("Inversion error");
+        let rnd_T:&G2 = &mac.T.mul(&inverse_r2);
+
+        let rnd_mac = SpMacEq {
+            R: rnd_R.clone(),
+            T: rnd_T.clone(),
+        };
+
+        rnd_mac
+    }
+
+    pub fn change_representation_with_message<R: Rng + CryptoRng>(mac: &SpMacEq, messages: &[G1], rng: &mut R) -> (Vec<G1>, SpMacEq) {
+        // let mut rng = ark_std::rand::thread_rng(); // todo
+        let r1 = ScalarField::rand(rng);
+        SpMacEq::change_representation_with_rand_with_message(mac, messages, &r1, rng)
+    }
+
+    pub fn change_representation_with_rand_with_message<R: Rng + CryptoRng>(mac: &SpMacEq, messages: &[G1], r1: &ScalarField, rng: &mut R) -> (Vec<G1>, SpMacEq) {
         // let mut rng = ark_std::rand::thread_rng(); // todo
         let r2 = ScalarField::rand(rng);
 
@@ -203,8 +240,8 @@ mod spmaceq_mac_tests {
         println!("Mac: {:?}", mac);
         println!("verify: {:?}", result);
 
-        let (rnd_messages, rnd_mac) = SpMacEq::change_representation(&mac, &messages, &mut rng);
-        let rnd_result = SpMacEq::verify(&sk, &rnd_mac, &rnd_messages);
+        let rnd_mac = SpMacEq::change_representation(&mac, &mut rng);
+        let rnd_result = SpMacEq::verify(&sk, &rnd_mac, &messages);
         println!("RND_Mac: {:?}", rnd_mac);
         println!("RND_verify: {:?}", rnd_result);
 
