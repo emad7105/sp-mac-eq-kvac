@@ -2,9 +2,10 @@ use crate::benchmark::benchmark_utils::*;
 use crate::primitives::kvac_pairing_less::KvacPL;
 use std::time::Instant;
 
-const ITERATIONS: usize = 10;
+const ITERATIONS: usize = 20;
 
 pub fn start_benchmarking() {
+    println!("Pairingless benchmark...\n");
     // S: attributes
     // D: subset, the first half of S (|s| = |D|/2)
     let S_sizes = vec![2usize.pow(4), 2usize.pow(6), 2usize.pow(8), 2usize.pow(10), 2usize.pow(12)];

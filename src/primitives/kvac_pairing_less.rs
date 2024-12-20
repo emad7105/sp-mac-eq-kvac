@@ -107,10 +107,11 @@ impl KvacPL {
         let mut rng = ark_std::rand::thread_rng();
         let y = ScalarField::rand(&mut rng);
         // 3. C <- y * f_S(v)G
+        let f_S_evaluated_at_v = Dvsc::evaluate_f_at_v_without_interpolation(&S, &isk.v);
         // calculate f_S = (x-s1)*(x-s2)...(x-sn) the vanishing polynomial
-        let f_S = Dvsc::construct_f(S);
+        // let f_S = Dvsc::construct_f(S);
         // f_S(v)
-        let f_S_evaluated_at_v = f_S.evaluate(&isk.v);
+        // let f_S_evaluated_at_v = f_S.evaluate(&isk.v);
         // y * f_S(v) G
         let G = G1::generator();
         let yf: Fp256<MontBackend<FrConfig, 4>> = y * f_S_evaluated_at_v;
@@ -182,13 +183,18 @@ impl KvacPL {
     pub fn verify(pp: &PublicParams, show: &Show, D: &[ScalarField], isk: &SecretKeys ) -> bool {
         // xWf_D(v) == tau_prime
         // f_D(x)
-        let f_D = Dvsc::construct_f(D);
+        // let f_D = Dvsc::construct_f(D);
         // f_D(v)
-        let f_D_evaluated_at_v = f_D.evaluate(&isk.v);
+        // let f_D_evaluated_at_v = f_D.evaluate(&isk.v);
+        let f_D_evaluated_at_v = Dvsc::evaluate_f_at_v_without_interpolation(&D, &isk.v);
+        // x.f_D(v)
+        let x_f_D_evaluated_at_v = &isk.x * &f_D_evaluated_at_v;
+        // W.x.f_D(v)
+        let xWf_D_evaluated_at_v = show.W.mul(x_f_D_evaluated_at_v);
         // Wf_D(v)
-        let Wf_D_evaluated_at_v  = show.W.mul(f_D_evaluated_at_v);
+        // let Wf_D_evaluated_at_v  = show.W.mul(f_D_evaluated_at_v);
         // xWf_D(v)
-        let xWf_D_evaluated_at_v = Wf_D_evaluated_at_v.mul(&isk.x);
+        // let xWf_D_evaluated_at_v = Wf_D_evaluated_at_v.mul(&isk.x);
 
         // (xWf_D(v) == tau_prime) && (tau_prime != 0G)
         xWf_D_evaluated_at_v.eq(&show.tau_prime) && (!show.tau_prime.eq(&G1::zero()))
@@ -412,6 +418,24 @@ mod spmaceq_mac_tests {
         let f2 = Dvsc::construct_f(&s_permuted);
 
         assert_eq!(f1.coeffs, f2.coeffs);
+    }
+
+    #[test]
+    fn test_evaluate_f_at_v_without_interpolation() {
+        let s = vec![ScalarField::from(2u64), ScalarField::from(10u64), ScalarField::from(3u64)];
+        let s_permuted = vec![ScalarField::from(3u64), ScalarField::from(10u64), ScalarField::from(2u64)];
+        let mut rng = ark_std::rand::thread_rng();
+        let v = ScalarField::rand(&mut rng);
+
+        let fv1 = Dvsc::evaluate_f_at_v_without_interpolation(&s, &v);
+        let fv2 = Dvsc::evaluate_f_at_v_without_interpolation(&s_permuted, &v);
+
+        assert_eq!(fv1, fv2);
+
+        let f_S = Dvsc::construct_f(&s);
+        let f_S_evaluate_at_v = f_S.evaluate(&v);
+
+        assert_eq!(fv1, f_S_evaluate_at_v);
     }
 
     #[test]

@@ -95,6 +95,17 @@ impl Dvsc{
         f
     }
 
+    pub fn evaluate_f_at_v_without_interpolation(x_set: &[ScalarField], v: &ScalarField) -> ScalarField {
+        // ∏ (v - x_i)
+        let mut prod = ScalarField::one();
+
+        for xi in x_set {
+            prod = prod * (v - xi);
+        }
+
+        prod
+    }
+
     pub fn evaluate_f_at_secret_point(f_coeffs: &[ScalarField], Yj: &[G1]) -> G1 {
         let mut eval = G1::zero();
         for j in 0..f_coeffs.len() {
@@ -225,8 +236,9 @@ impl Dvsc{
 
 
     pub fn verify_subset(pp: &DvscSetupParams, ipar: &DvscPublicParam, sk: &DvscSk, C_prime: &Commitment, W: &Commitment, D: &[ScalarField]) -> bool {
-        let f_D = Dvsc::construct_f(&D);
-        let f_D_evaluated_at_v = f_D.evaluate(&sk.sk);
+        // let f_D = Dvsc::construct_f(&D);
+        // let f_D_evaluated_at_v = f_D.evaluate(&sk.sk);
+        let f_D_evaluated_at_v = Dvsc::evaluate_f_at_v_without_interpolation(&D, &sk.sk);
 
         let WW2 = W.fs_evaluated_at_v_G.mul(f_D_evaluated_at_v);
 

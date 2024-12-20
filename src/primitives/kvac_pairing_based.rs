@@ -181,8 +181,10 @@ impl KvacPB {
         let W2 = show.W.G_prime;
 
         // 9. C_prime = (f_D(v)W1, W2)
-        let f_D = Dvsc::construct_f(D);
-        let f_D_evaluated_at_v = f_D.evaluate(&isk.sk_DVSC.sk);
+        // let f_D = Dvsc::construct_f(D);
+        // let f_D_evaluated_at_v = f_D.evaluate(&isk.sk_DVSC.sk);
+        let f_D_evaluated_at_v = Dvsc::evaluate_f_at_v_without_interpolation(&D, &isk.sk_DVSC.sk);
+
         let f_D_evaluated_at_v_W1 = W1.mul(f_D_evaluated_at_v);
         let C_prime = vec![f_D_evaluated_at_v_W1, W2];
 
@@ -284,6 +286,102 @@ impl KvacPB {
 
         hash_bigint
     }
+
+    pub fn size_of_pre_cred(pre_cred: &PreCredential) -> usize {
+        let mut buffer = Vec::new();
+
+        // Serialize `tau` (SpMacEq) and its fields
+        pre_cred.tau.R.serialize_compressed(&mut buffer).unwrap();
+        let size_r = buffer.len();
+        buffer.clear();
+
+        pre_cred.tau.T.serialize_compressed(&mut buffer).unwrap();
+        let size_t = buffer.len();
+        buffer.clear();
+
+        let size_tau = size_r + size_t;
+
+        // Serialize `pok` (PoK) and its fields
+        pre_cred.pok.c.serialize_compressed(&mut buffer).unwrap();
+        let size_c = buffer.len();
+        buffer.clear();
+
+        pre_cred.pok.s_a_minus_1.serialize_compressed(&mut buffer).unwrap();
+        let size_s_a_minus_1 = buffer.len();
+        buffer.clear();
+
+        pre_cred.pok.s_x1.serialize_compressed(&mut buffer).unwrap();
+        let size_s_x1 = buffer.len();
+        buffer.clear();
+
+        pre_cred.pok.s_x2.serialize_compressed(&mut buffer).unwrap();
+        let size_s_x2 = buffer.len();
+        buffer.clear();
+
+        let size_pok = size_c + size_s_a_minus_1 + size_s_x1 + size_s_x2;
+
+        // Total size
+        size_tau + size_pok
+    }
+
+    pub fn size_of_credential(credential: &Credential) -> usize {
+        let mut buffer = Vec::new();
+
+        // Serialize `Commitment` and its fields
+        credential.C.fs_evaluated_at_v_G.serialize_compressed(&mut buffer).unwrap();
+        let size_fs_evaluated = buffer.len();
+        buffer.clear();
+
+        credential.C.G_prime.serialize_compressed(&mut buffer).unwrap();
+        let size_g_prime = buffer.len();
+        buffer.clear();
+
+        let size_commitment = size_fs_evaluated + size_g_prime;
+
+        // Serialize `tau` (SpMacEq) and its fields
+        credential.tau.R.serialize_compressed(&mut buffer).unwrap();
+        let size_r = buffer.len();
+        buffer.clear();
+
+        credential.tau.T.serialize_compressed(&mut buffer).unwrap();
+        let size_t = buffer.len();
+        buffer.clear();
+
+        let size_spmaceq = size_r + size_t;
+
+        // Total size
+        size_commitment + size_spmaceq
+    }
+
+    pub fn size_of_show(show: &Show) -> usize {
+        let mut buffer = Vec::new();
+
+        // Serialize `tau_prime` (SpMacEq) and its fields
+        show.tau_prime.R.serialize_compressed(&mut buffer).unwrap();
+        let size_r = buffer.len();
+        buffer.clear();
+
+        show.tau_prime.T.serialize_compressed(&mut buffer).unwrap();
+        let size_t = buffer.len();
+        buffer.clear();
+
+        let size_tau_prime = size_r + size_t;
+
+        // Serialize `W` (Commitment) and its fields
+        show.W.fs_evaluated_at_v_G.serialize_compressed(&mut buffer).unwrap();
+        let size_fs_evaluated = buffer.len();
+        buffer.clear();
+
+        show.W.G_prime.serialize_compressed(&mut buffer).unwrap();
+        let size_g_prime = buffer.len();
+        buffer.clear();
+
+        let size_commitment = size_fs_evaluated + size_g_prime;
+
+        // Total size
+        size_tau_prime + size_commitment
+    }
+
 }
 
 
