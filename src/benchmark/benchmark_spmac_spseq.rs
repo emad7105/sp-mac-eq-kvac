@@ -3,8 +3,8 @@ use ark_bls12_381::{Fr as ScalarField, G1Projective as G1, G2Projective as G2, B
 use ark_ec::Group;
 use std::ops::Mul;
 use ark_std::UniformRand;
-use crate::primitives::spmac_bls12_381::SpMacEq;
-use crate::primitives::spseq_bls12_381::SpsEqSignature;
+use crate::protocols::spmac_bls12_381::SpMacEq;
+use crate::protocols::spseq_bls12_381::SpsEqSignature;
 
 pub fn start_benchmarking() {
     println!("Benchmarking SPS-EQ and SP-MAC");

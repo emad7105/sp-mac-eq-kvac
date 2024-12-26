@@ -1,5 +1,5 @@
 use crate::benchmark::benchmark_utils::*;
-use crate::primitives::kvac_pairing_less_bls12_381_g1::KvacPL;
+use crate::protocols::kvac_pairing_less_bls12_381_g1::KvacPL;
 use std::time::Instant;
 
 const ITERATIONS: usize = 20;

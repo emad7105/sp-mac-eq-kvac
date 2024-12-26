@@ -135,9 +135,9 @@ impl SpsEqSignature {
 
     pub fn to_bytes(&self) -> Vec<Vec<u8>>{
         let mut output = vec![];
-        let s_bytes = crate::primitives::hex_utils::g1_to_bytes(&self.S);
-        let r_bytes = crate::primitives::hex_utils::g1_to_bytes(&self.R);
-        let t_bytes = crate::primitives::hex_utils::g2_to_bytes(&self.T);
+        let s_bytes = crate::protocols::hex_utils::g1_to_bytes(&self.S);
+        let r_bytes = crate::protocols::hex_utils::g1_to_bytes(&self.R);
+        let t_bytes = crate::protocols::hex_utils::g2_to_bytes(&self.T);
 
         output.push(s_bytes);
         output.push(r_bytes);
@@ -147,9 +147,9 @@ impl SpsEqSignature {
     }
 
     pub fn from_bytes(hex: &[Vec<u8>]) -> Self {
-        let s = crate::primitives::hex_utils::bytes_to_g1(hex.get(0).expect("wrong bytes"));
-        let r = crate::primitives::hex_utils::bytes_to_g1(hex.get(1).expect("wrong bytes"));
-        let t = crate::primitives::hex_utils::bytes_to_g2(hex.get(2).expect("wrong bytes"));
+        let s = crate::protocols::hex_utils::bytes_to_g1(hex.get(0).expect("wrong bytes"));
+        let r = crate::protocols::hex_utils::bytes_to_g1(hex.get(1).expect("wrong bytes"));
+        let t = crate::protocols::hex_utils::bytes_to_g2(hex.get(2).expect("wrong bytes"));
 
         SpsEqSignature {
             S:s,

@@ -55,14 +55,14 @@ impl SpMacEq {
     }
 
     pub fn to_bytes(&self) -> Vec<Vec<u8>> {
-        let r_bytes = crate::primitives::hex_utils::g1_to_bytes(&self.R);
-        let t_bytes = crate::primitives::hex_utils::g2_to_bytes(&self.T);
+        let r_bytes = crate::protocols::hex_utils::g1_to_bytes(&self.R);
+        let t_bytes = crate::protocols::hex_utils::g2_to_bytes(&self.T);
         vec![r_bytes,t_bytes]
     }
 
     pub fn from_bytes(bytes: &[Vec<u8>]) -> Self {
-        let r = crate::primitives::hex_utils::bytes_to_g1(bytes.get(0).unwrap());
-        let t = crate::primitives::hex_utils::bytes_to_g2(bytes.get(1).unwrap());
+        let r = crate::protocols::hex_utils::bytes_to_g1(bytes.get(0).unwrap());
+        let t = crate::protocols::hex_utils::bytes_to_g2(bytes.get(1).unwrap());
 
         SpMacEq{
             R: r,

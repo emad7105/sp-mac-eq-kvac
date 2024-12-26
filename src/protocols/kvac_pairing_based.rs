@@ -13,9 +13,9 @@ use std::collections::HashSet;
 use std::future::poll_fn;
 use ark_serialize::CanonicalSerialize;
 use sha2::{Sha256,Digest};
-use crate::primitives::dvsc;
-use crate::primitives::dvsc::{Commitment, Dvsc, DvscPublicParam, DvscSetupParams, DvscSk};
-use crate::primitives::spmac_bls12_381::SpMacEq;
+use crate::protocols::dvsc;
+use crate::protocols::dvsc::{Commitment, Dvsc, DvscPublicParam, DvscSetupParams, DvscSk};
+use crate::protocols::spmac_bls12_381::SpMacEq;
 
 
 pub struct KvacPB {}
@@ -390,7 +390,7 @@ impl KvacPB {
 mod spmaceq_mac_tests {
     use std::ops::Mul;
     use ark_ec::hashing::map_to_curve_hasher::MapToCurveBasedHasher;
-    use crate::primitives::kvac_pairing_based::KvacPB;
+    use crate::protocols::kvac_pairing_based::KvacPB;
     use ark_std::UniformRand;
     use ark_bls12_381::{Fr as ScalarField, G1Projective as G1, G2Projective as G2, Bls12_381, G1Projective, Fr, FrConfig};
     use ark_ec::Group;

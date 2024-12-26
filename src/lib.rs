@@ -1,2 +1,2 @@
-pub mod primitives;
+pub mod protocols;
 pub mod benchmark;

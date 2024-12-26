@@ -12,7 +12,7 @@ use ark_std::iterable::Iterable;
 use std::collections::HashSet;
 use ark_serialize::CanonicalSerialize;
 use sha2::Sha256;
-use crate::primitives::dvsc::Dvsc;
+use crate::protocols::dvsc::Dvsc;
 use sha2::Digest;
 
 
@@ -380,10 +380,10 @@ mod spmaceq_mac_tests {
     use ark_ff::{Fp256, MontBackend};
     use ark_poly::Polynomial;
     use ark_std::UniformRand;
-    use crate::primitives::dvsc::Dvsc;
-    use crate::primitives::kvac_pairing_less_bls12_381_g1::KvacPL;
-    use crate::primitives::kvac_pairing_less_bls12_381_g1::ScalarField;
-    use crate::primitives::kvac_pairing_less_bls12_381_g1::G1;
+    use crate::protocols::dvsc::Dvsc;
+    use crate::protocols::kvac_pairing_less_bls12_381_g1::KvacPL;
+    use crate::protocols::kvac_pairing_less_bls12_381_g1::ScalarField;
+    use crate::protocols::kvac_pairing_less_bls12_381_g1::G1;
 
     #[test]
     fn test_kvac_full_flow_test() {
