@@ -1,0 +1,35 @@
+Pairingless (curve: ed25519) benchmark...
+
+(S_size, D_size): [Average execution time], [Output size]
+
+Issue_cred():
+------------
+(16, 8): 2.796 ms, pre_cred: 672 bytes (0.656 KB)
+(64, 32): 10.373 ms, pre_cred: 2208 bytes (2.156 KB)
+(256, 128): 40.770 ms, pre_cred: 8352 bytes (8.156 KB)
+(1024, 512): 161.028 ms, pre_cred: 32928 bytes (32.156 KB)
+(4096, 2048): 645.162 ms, pre_cred: 131232 bytes (128.156 KB)
+
+Obtain_cred():
+------------
+(16, 8): 3.895 ms, cred: 576 bytes (0.562 KB)
+(64, 32): 14.922 ms, cred: 2112 bytes (2.062 KB)
+(256, 128): 60.771 ms, cred: 8256 bytes (8.062 KB)
+(1024, 512): 260.046 ms, cred: 32832 bytes (32.062 KB)
+(4096, 2048): 1258.604 ms, cred: 131136 bytes (128.062 KB)
+
+Show_cred():
+------------
+(16, 8): 0.742 ms, show: 64 bytes (0.062 KB)
+(64, 32): 2.551 ms, show: 64 bytes (0.062 KB)
+(256, 128): 10.129 ms, show: 64 bytes (0.062 KB)
+(1024, 512): 43.379 ms, show: 64 bytes (0.062 KB)
+(4096, 2048): 230.114 ms, show: 64 bytes (0.062 KB)
+
+Verify_cred():
+------------
+(16, 8): 0.068 ms
+(64, 32): 0.068 ms
+(256, 128): 0.070 ms
+(1024, 512): 0.075 ms
+(4096, 2048): 0.097 ms
