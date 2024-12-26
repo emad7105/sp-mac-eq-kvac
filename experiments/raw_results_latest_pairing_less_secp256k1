@@ -1,0 +1,35 @@
+Pairingless (curve: secp256k1) benchmark...
+
+(S_size, D_size): [Average execution time], [Output size]
+
+Issue_cred():
+------------
+(16, 8): 4.133 ms, pre_cred: 690 bytes (0.674 KB)
+(64, 32): 14.020 ms, pre_cred: 2274 bytes (2.221 KB)
+(256, 128): 54.852 ms, pre_cred: 8610 bytes (8.408 KB)
+(1024, 512): 218.192 ms, pre_cred: 33954 bytes (33.158 KB)
+(4096, 2048): 868.109 ms, pre_cred: 135330 bytes (132.158 KB)
+
+Obtain_cred():
+------------
+(16, 8): 5.258 ms, cred: 594 bytes (0.580 KB)
+(64, 32): 20.059 ms, cred: 2178 bytes (2.127 KB)
+(256, 128): 82.898 ms, cred: 8514 bytes (8.314 KB)
+(1024, 512): 344.206 ms, cred: 33858 bytes (33.064 KB)
+(4096, 2048): 1640.903 ms, cred: 135234 bytes (132.064 KB)
+
+Show_cred():
+------------
+(16, 8): 0.994 ms, show: 66 bytes (0.064 KB)
+(64, 32): 3.492 ms, show: 66 bytes (0.064 KB)
+(256, 128): 13.697 ms, show: 66 bytes (0.064 KB)
+(1024, 512): 58.342 ms, show: 66 bytes (0.064 KB)
+(4096, 2048): 303.244 ms, show: 66 bytes (0.064 KB)
+
+Verify_cred():
+------------
+(16, 8): 0.084 ms
+(64, 32): 0.088 ms
+(256, 128): 0.081 ms
+(1024, 512): 0.095 ms
+(4096, 2048): 0.124 ms

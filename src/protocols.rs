@@ -6,3 +6,5 @@ pub mod kvac_pairing_based;
 pub mod dvsc;
 pub mod kvac_pairing_less_ed25519;
 pub mod polynomial_utils_ed25519;
+pub mod polynomial_utils_secp256k1;
+pub mod kvac_pairing_less_secp256k1;

@@ -12,6 +12,7 @@ path = "bin/benchmark.rs"
 [dependencies]
 ark-bls12-381 = "0.5.0-alpha.0"
 ark-ed25519 = "0.5.0-alpha.0"
+ark-secp256k1 = "0.5.0-alpha.0"
 ark-std = "0.5.0-alpha.0"
 ark-poly = "0.5.0-alpha.0"
 rand = "0.8.5"
