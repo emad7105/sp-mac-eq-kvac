@@ -1,13 +1,11 @@
 use crate::benchmark::benchmark_utils_bls12_381_g1::*;
-use crate::protocols::kvac_pairing_based::KvacPB;
+use crate::protocols::kvac_pairing_less_bls12_381_g1::KvacPLBLS12;
 use std::time::Instant;
 
-const ITERATIONS: usize = 20;
-
+const ITERATIONS: usize = 50;
 
 pub fn start_benchmarking() {
-    println!("Pairing-based benchmark...\n");
-
+    println!("Pairingless (curve: BLS12_381) benchmark...\n");
     // S: attributes
     // D: subset, the first half of S (|s| = |D|/2)
     let S_sizes = vec![2usize.pow(4), 2usize.pow(6), 2usize.pow(8), 2usize.pow(10), 2usize.pow(12)];
@@ -21,15 +19,15 @@ pub fn start_benchmarking() {
     benchmark_verify_cred(&S_sizes, &D_sizes);
 }
 
-
 pub fn benchmark_issue_cred(S_sizes: &[usize], D_sizes: &[usize]) {
     println!("\nIssue_cred():\n------------");
 
+    // 0. key gens
+    let isk = KvacPLBLS12::gen_isk();
+    let pp = KvacPLBLS12::gen_public_params(&isk);
+
     for (s_size, d_size) in S_sizes.iter().zip(D_sizes.iter()) {
         // println!("S_size: {}, D_size: {}", s_size, d_size);
-
-        // 0. key gens
-        let (isk, pp) = KvacPB::key_gen(s_size+2);
 
         let S = prepare_set_S(s_size.clone());
         let D = prepare_set_D(d_size.clone(), &S);
@@ -40,11 +38,11 @@ pub fn benchmark_issue_cred(S_sizes: &[usize], D_sizes: &[usize]) {
 
         for _ in 0..ITERATIONS {
             let start = Instant::now();
-            let pre_cred = KvacPB::issue_cred(&pp, &S, &isk);
+            let pre_cred = KvacPLBLS12::issue_cred(&pp, &S, &isk);
             let duration = start.elapsed();
             total_time_ms += duration.as_secs_f64() * 1000.0; // Convert to milliseconds
 
-            pre_cred_size = KvacPB::size_of_pre_cred(&pre_cred);
+            pre_cred_size = KvacPLBLS12::size_of_pre_cred(&pre_cred);
             pre_cred_size_kb = pre_cred_size as f64 / 1024.0;
         }
 
@@ -57,6 +55,9 @@ pub fn benchmark_issue_cred(S_sizes: &[usize], D_sizes: &[usize]) {
 pub fn benchmark_obtain_cred(S_sizes: &[usize], D_sizes: &[usize]) {
     println!("\nObtain_cred():\n------------");
 
+    // 0. key gens
+    let isk = KvacPLBLS12::gen_isk();
+    let pp = KvacPLBLS12::gen_public_params(&isk);
 
     for (s_size, d_size) in S_sizes.iter().zip(D_sizes.iter()) {
         // println!("S_size: {}, D_size: {}", s_size, d_size);
@@ -64,21 +65,18 @@ pub fn benchmark_obtain_cred(S_sizes: &[usize], D_sizes: &[usize]) {
         let S = prepare_set_S(s_size.clone());
         let D = prepare_set_D(d_size.clone(), &S);
 
-        // 0. key gens
-        let (isk, pp) = KvacPB::key_gen(s_size+2);
-
         let mut total_time_ms = 0.0;
-        let pre_cred = KvacPB::issue_cred(&pp, &S, &isk);
+        let pre_cred = KvacPLBLS12::issue_cred(&pp, &S, &isk);
         let mut cred_size = 0;
         let mut cred_size_kb = 0.0;
 
         for _ in 0..ITERATIONS {
             let start = Instant::now();
-            let cred = KvacPB::obtain_cred(&pp, &pre_cred, &S);
+            let cred = KvacPLBLS12::obtain_cred(&pp, &pre_cred, &S);
             let duration = start.elapsed();
             total_time_ms += duration.as_secs_f64() * 1000.0; // Convert to milliseconds
 
-            cred_size = KvacPB::size_of_credential(&cred);
+            cred_size = KvacPLBLS12::size_of_credential(&cred);
             cred_size_kb = cred_size as f64 / 1024.0;
         }
 
@@ -91,28 +89,29 @@ pub fn benchmark_obtain_cred(S_sizes: &[usize], D_sizes: &[usize]) {
 pub fn benchmark_show_cred(S_sizes: &[usize], D_sizes: &[usize]) {
     println!("\nShow_cred():\n------------");
 
+    // 0. key gens
+    let isk = KvacPLBLS12::gen_isk();
+    let pp = KvacPLBLS12::gen_public_params(&isk);
+
     for (s_size, d_size) in S_sizes.iter().zip(D_sizes.iter()) {
         // println!("S_size: {}, D_size: {}", s_size, d_size);
 
         let S = prepare_set_S(s_size.clone());
         let D = prepare_set_D(d_size.clone(), &S);
 
-        // 0. key gens
-        let (isk, pp) = KvacPB::key_gen(s_size+2);
-
         let mut total_time_ms = 0.0;
-        let pre_cred = KvacPB::issue_cred(&pp, &S, &isk);
-        let cred = KvacPB::obtain_cred(&pp, &pre_cred, &S);
+        let pre_cred = KvacPLBLS12::issue_cred(&pp, &S, &isk);
+        let cred = KvacPLBLS12::obtain_cred(&pp, &pre_cred, &S);
         let mut show_size = 0;
         let mut show_size_kb = 0.0;
 
         for _ in 0..ITERATIONS {
             let start = Instant::now();
-            let show = KvacPB::show_cred(&pp, &cred, &S, &D);
+            let show = KvacPLBLS12::show_cred(&pp, &cred, &S, &D);
             let duration = start.elapsed();
             total_time_ms += duration.as_secs_f64() * 1000.0; // Convert to milliseconds
 
-            show_size = KvacPB::size_of_show(&show);
+            show_size = KvacPLBLS12::size_of_show(&show);
             show_size_kb = show_size as f64 / 1024.0;
         }
 
@@ -126,6 +125,9 @@ pub fn benchmark_show_cred(S_sizes: &[usize], D_sizes: &[usize]) {
 pub fn benchmark_verify_cred(S_sizes: &[usize], D_sizes: &[usize]) {
     println!("\nVerify_cred():\n------------");
 
+    // 0. key gens
+    let isk = KvacPLBLS12::gen_isk();
+    let pp = KvacPLBLS12::gen_public_params(&isk);
 
     for (s_size, d_size) in S_sizes.iter().zip(D_sizes.iter()) {
         // println!("S_size: {}, D_size: {}", s_size, d_size);
@@ -133,18 +135,15 @@ pub fn benchmark_verify_cred(S_sizes: &[usize], D_sizes: &[usize]) {
         let S = prepare_set_S(s_size.clone());
         let D = prepare_set_D(d_size.clone(), &S);
 
-        // 0. key gens
-        let (isk, pp) = KvacPB::key_gen(s_size+2);
-
         let mut total_time_ms = 0.0;
-        let pre_cred = KvacPB::issue_cred(&pp, &S, &isk);
-        let cred = KvacPB::obtain_cred(&pp, &pre_cred, &S);
-        let show = KvacPB::show_cred(&pp, &cred, &S, &D);
+        let pre_cred = KvacPLBLS12::issue_cred(&pp, &S, &isk);
+        let cred = KvacPLBLS12::obtain_cred(&pp, &pre_cred, &S);
+        let show = KvacPLBLS12::show_cred(&pp, &cred, &S, &D);
 
 
         for _ in 0..ITERATIONS {
             let start = Instant::now();
-            let result = KvacPB::verify(&pp, &show, &D, &isk);
+            let result = KvacPLBLS12::verify(&pp, &show, &D, &isk);
             let duration = start.elapsed();
             total_time_ms += duration.as_secs_f64() * 1000.0; // Convert to milliseconds
         }
