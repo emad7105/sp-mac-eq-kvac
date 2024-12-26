@@ -381,9 +381,9 @@ mod spmaceq_mac_tests {
     use ark_poly::Polynomial;
     use ark_std::UniformRand;
     use crate::primitives::dvsc::Dvsc;
-    use crate::primitives::kvac_pairing_less::KvacPL;
-    use crate::primitives::kvac_pairing_less::ScalarField;
-    use crate::primitives::kvac_pairing_less::G1;
+    use crate::primitives::kvac_pairing_less_bls12_381_g1::KvacPL;
+    use crate::primitives::kvac_pairing_less_bls12_381_g1::ScalarField;
+    use crate::primitives::kvac_pairing_less_bls12_381_g1::G1;
 
     #[test]
     fn test_kvac_full_flow_test() {

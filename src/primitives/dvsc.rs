@@ -10,7 +10,7 @@ use ark_std::One;
 use std::ops::Neg;
 use ark_std::iterable::Iterable;
 use std::collections::HashSet;
-use crate::primitives::kvac_pairing_less::KvacPL;
+use crate::primitives::kvac_pairing_less_bls12_381_g1::KvacPL;
 use crate::primitives::spmac_bls12_381::SpMacEq;
 use std::ops::Add;
 use ark_serialize::CanonicalSerialize;
