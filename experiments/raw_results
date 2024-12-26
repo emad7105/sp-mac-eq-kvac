@@ -5,35 +5,35 @@ Pairingless benchmark...
 
 Issue_cred():
 ------------
-(16, 8): 6.921 ms, pre_cred: 960 bytes (0.938 KB)
-(64, 32): 21.752 ms, pre_cred: 3264 bytes (3.188 KB)
-(256, 128): 85.550 ms, pre_cred: 12480 bytes (12.188 KB)
-(1024, 512): 340.791 ms, pre_cred: 49344 bytes (48.188 KB)
-(4096, 2048): 1354.058 ms, pre_cred: 196800 bytes (192.188 KB)
+(16, 8): 6.143 ms, pre_cred: 960 bytes (0.938 KB)
+(64, 32): 21.741 ms, pre_cred: 3264 bytes (3.188 KB)
+(256, 128): 85.716 ms, pre_cred: 12480 bytes (12.188 KB)
+(1024, 512): 337.586 ms, pre_cred: 49344 bytes (48.188 KB)
+(4096, 2048): 1357.423 ms, pre_cred: 196800 bytes (192.188 KB)
 
 Obtain_cred():
 ------------
-(16, 8): 7.895 ms, cred: 912 bytes (0.891 KB)
-(64, 32): 30.377 ms, cred: 3216 bytes (3.141 KB)
-(256, 128): 122.100 ms, cred: 12432 bytes (12.141 KB)
-(1024, 512): 512.565 ms, cred: 49296 bytes (48.141 KB)
-(4096, 2048): 2354.835 ms, cred: 196752 bytes (192.141 KB)
+(16, 8): 8.335 ms, cred: 864 bytes (0.844 KB)
+(64, 32): 31.903 ms, cred: 3168 bytes (3.094 KB)
+(256, 128): 128.270 ms, cred: 12384 bytes (12.094 KB)
+(1024, 512): 531.214 ms, cred: 49248 bytes (48.094 KB)
+(4096, 2048): 2366.743 ms, cred: 196704 bytes (192.094 KB)
 
 Show_cred():
 ------------
-(16, 8): 1.617 ms, show: 96 bytes (0.094 KB)
-(64, 32): 5.405 ms, show: 96 bytes (0.094 KB)
-(256, 128): 20.636 ms, show: 96 bytes (0.094 KB)
-(1024, 512): 85.291 ms, show: 96 bytes (0.094 KB)
-(4096, 2048): 402.898 ms, show: 96 bytes (0.094 KB)
+(16, 8): 1.607 ms, show: 96 bytes (0.094 KB)
+(64, 32): 5.479 ms, show: 96 bytes (0.094 KB)
+(256, 128): 20.844 ms, show: 96 bytes (0.094 KB)
+(1024, 512): 87.501 ms, show: 96 bytes (0.094 KB)
+(4096, 2048): 411.198 ms, show: 96 bytes (0.094 KB)
 
 Verify_cred():
 ------------
-(16, 8): 0.139 ms
-(64, 32): 0.151 ms
-(256, 128): 0.143 ms
-(1024, 512): 0.144 ms
-(4096, 2048): 0.165 ms
+(16, 8): 0.152 ms
+(64, 32): 0.142 ms
+(256, 128): 0.154 ms
+(1024, 512): 0.160 ms
+(4096, 2048): 0.172 ms
 Pairing-based benchmark...
 
 (S_size, D_size): [Average execution time], [Output size]
@@ -41,31 +41,31 @@ Pairing-based benchmark...
 Issue_cred():
 ------------
 (16, 8): 4.836 ms, pre_cred: 272 bytes (0.266 KB)
-(64, 32): 12.644 ms, pre_cred: 272 bytes (0.266 KB)
-(256, 128): 43.339 ms, pre_cred: 272 bytes (0.266 KB)
-(1024, 512): 184.877 ms, pre_cred: 272 bytes (0.266 KB)
-(4096, 2048): 980.832 ms, pre_cred: 272 bytes (0.266 KB)
+(64, 32): 12.528 ms, pre_cred: 272 bytes (0.266 KB)
+(256, 128): 44.581 ms, pre_cred: 272 bytes (0.266 KB)
+(1024, 512): 186.216 ms, pre_cred: 272 bytes (0.266 KB)
+(4096, 2048): 991.882 ms, pre_cred: 272 bytes (0.266 KB)
 
 Obtain_cred():
 ------------
-(16, 8): 4.686 ms, cred: 240 bytes (0.234 KB)
-(64, 32): 12.307 ms, cred: 240 bytes (0.234 KB)
-(256, 128): 43.826 ms, cred: 240 bytes (0.234 KB)
-(1024, 512): 184.261 ms, cred: 240 bytes (0.234 KB)
-(4096, 2048): 981.722 ms, cred: 240 bytes (0.234 KB)
+(16, 8): 4.695 ms, cred: 144 bytes (0.141 KB)
+(64, 32): 12.383 ms, cred: 144 bytes (0.141 KB)
+(256, 128): 44.524 ms, cred: 144 bytes (0.141 KB)
+(1024, 512): 187.648 ms, cred: 144 bytes (0.141 KB)
+(4096, 2048): 992.525 ms, cred: 144 bytes (0.141 KB)
 
 Show_cred():
 ------------
-(16, 8): 2.693 ms, show: 240 bytes (0.234 KB)
-(64, 32): 6.470 ms, show: 240 bytes (0.234 KB)
-(256, 128): 21.882 ms, show: 240 bytes (0.234 KB)
-(1024, 512): 87.683 ms, show: 240 bytes (0.234 KB)
-(4096, 2048): 408.177 ms, show: 240 bytes (0.234 KB)
+(16, 8): 2.362 ms, show: 240 bytes (0.234 KB)
+(64, 32): 6.311 ms, show: 240 bytes (0.234 KB)
+(256, 128): 21.872 ms, show: 240 bytes (0.234 KB)
+(1024, 512): 88.384 ms, show: 240 bytes (0.234 KB)
+(4096, 2048): 412.398 ms, show: 240 bytes (0.234 KB)
 
 Verify_cred():
 ------------
-(16, 8): 2.451 ms
-(64, 32): 2.476 ms
-(256, 128): 2.363 ms
-(1024, 512): 2.369 ms
-(4096, 2048): 2.362 ms
+(16, 8): 2.458 ms
+(64, 32): 2.419 ms
+(256, 128): 2.442 ms
+(1024, 512): 2.464 ms
+(4096, 2048): 2.514 ms
