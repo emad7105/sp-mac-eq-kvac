@@ -1,7 +1,7 @@
 use ark_bls12_381::{Fr as ScalarField, G1Projective as G1, G2Projective as G2, Bls12_381, G1Projective, Fr, FrConfig};
 use std::ops::{AddAssign, Mul, Sub};
 use ark_ec::pairing::Pairing;
-use ark_ec::{CurveGroup, Group};
+use ark_ec::{CurveGroup, PrimeGroup};
 use ark_ff::{Field, Fp, Fp256, MontBackend, PrimeField};
 use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial, Polynomial};
 use rand::{CryptoRng, Rng};
@@ -10,7 +10,7 @@ use ark_std::One;
 use std::ops::Neg;
 use ark_std::iterable::Iterable;
 use std::collections::HashSet;
-use crate::protocols::kvac_pairing_less_bls12_381_g1::KvacPL;
+use crate::protocols::kvac_pairing_less_bls12_381_g1::KvacPLBLS12;
 use crate::protocols::spmac_bls12_381::SpMacEq;
 use std::ops::Add;
 use ark_serialize::CanonicalSerialize;
@@ -255,7 +255,7 @@ mod Dvsc_tests {
     use crate::protocols::dvsc::G1;
     use ark_std::UniformRand;
     use ark_poly::Polynomial;
-    use ark_ec::Group;
+    use ark_ec::PrimeGroup;
     use ark_ff::Field;
     use ark_poly::univariate::DensePolynomial;
     use ark_poly::DenseUVPolynomial;

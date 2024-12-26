@@ -1,29 +1,20 @@
-use ark_bls12_381::{Fr as ScalarField, G1Projective as G1, G2Projective as G2, Bls12_381, G1Projective, Fr, FrConfig};
-use std::ops::{AddAssign, Mul, Sub};
-use ark_ec::pairing::Pairing;
+use std::ops::{Mul, Sub};
 use ark_ec::{CurveGroup, PrimeGroup};
-use ark_ff::{BigInteger, Field, Fp, Fp256, MontBackend, PrimeField};
-use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial, Polynomial};
-use rand::{CryptoRng, Rng};
-use ark_std::{UniformRand, Zero};
-use ark_std::One;
-use std::ops::Neg;
-use ark_std::iterable::Iterable;
-use std::collections::HashSet;
+use ark_ed25519::{Fr as ScalarField, EdwardsProjective as G, FrConfig, Fr, EdwardsProjective};
+use ark_ff::{BigInteger, Field, Fp256, MontBackend, PrimeField};
 use ark_serialize::CanonicalSerialize;
+use ark_std::{UniformRand, Zero};
 use sha2::Sha256;
-use crate::protocols::dvsc::Dvsc;
+use crate::protocols::polynomial_utils_ed25519;
 use sha2::Digest;
 
 
-pub struct KvacPLBLS12 {}
+pub struct KvacPLEd25519 {}
 
 pub struct PublicParams {
-    R: G1,
-    X: G1,
-    V: G1,
-    // Vj: Vec<G1>,
-    // t: usize,
+    R: G,
+    X: G,
+    V: G,
 }
 
 pub struct SecretKeys {
@@ -32,16 +23,15 @@ pub struct SecretKeys {
 }
 
 pub struct PreCredential {
-    tau: G1,
-    Yj: Vec<G1>,
+    tau: G,
+    Yj: Vec<G>,
     pok: PoK,
 }
 
 
 pub struct Credential {
-    // C: G1,
-    tau: G1,
-    Yj: Vec<G1>,
+    tau: G,
+    Yj: Vec<G>,
 }
 
 pub struct Witness {
@@ -56,12 +46,12 @@ pub struct PoK {
 }
 
 pub struct Show {
-    tau_prime: G1,
-    W: G1,
+    tau_prime: G,
+    W: G,
 }
 
 
-impl KvacPLBLS12 {
+impl KvacPLEd25519 {
     pub fn gen_isk() -> SecretKeys {
         let mut rng = ark_std::rand::thread_rng(); // todo
 
@@ -77,13 +67,13 @@ impl KvacPLBLS12 {
     pub fn gen_public_params(isk: &SecretKeys) -> PublicParams {
         let mut rng = ark_std::rand::thread_rng();
         let r = ScalarField::rand(&mut rng);
-        let G = G1::generator();
+        let Gen = G::generator();
         // rG
-        let R = G.mul(r);
+        let R = Gen.mul(r);
         // rxG
         let X = R.mul(&isk.x);
         // vG
-        let V = G.mul(&isk.v);
+        let V = Gen.mul(&isk.v);
         // {v_j*G} for j in [0...t]
         // let mut Vj = vec![];
         // for j in 0..t {
@@ -107,15 +97,15 @@ impl KvacPLBLS12 {
         let mut rng = ark_std::rand::thread_rng();
         let y = ScalarField::rand(&mut rng);
         // 3. C <- y * f_S(v)G
-        let f_S_evaluated_at_v = Dvsc::evaluate_f_at_v_without_interpolation(&S, &isk.v);
+        let f_S_evaluated_at_v = polynomial_utils_ed25519::evaluate_f_at_v_without_interpolation(&S, &isk.v);
         // calculate f_S = (x-s1)*(x-s2)...(x-sn) the vanishing polynomial
-        // let f_S = Dvsc::construct_f(S);
+        // let f_S = polynomial_utils_ed25519::construct_f(S);
         // f_S(v)
         // let f_S_evaluated_at_v = f_S.evaluate(&isk.v);
         // y * f_S(v) G
-        let G = G1::generator();
+        let Gen = G::generator();
         let yf: Fp256<MontBackend<FrConfig, 4>> = y * f_S_evaluated_at_v;
-        let C = G.mul(yf);
+        let C = Gen.mul(yf);
         // tau = x*C
         let tau = C.mul(&isk.x);
         // (Y_j = y*V_jG) for j in [|S|]
@@ -123,7 +113,7 @@ impl KvacPLBLS12 {
         for j in 0..(S.len()+1) {
             let v_power_j = isk.v.pow([j as u64]);
             let yvj: Fp256<MontBackend<FrConfig, 4>> = v_power_j * y.clone();
-            let yvjG = G.mul(yvj);
+            let yvjG = Gen.mul(yvj);
             Yj.push(yvjG);
         }
 
@@ -131,7 +121,7 @@ impl KvacPLBLS12 {
             x: isk.x.clone(),
             v: isk.v.clone(),
         };
-        let pok = KvacPLBLS12::pok(&witness, &C, &pp.R, &pp.X, &Yj, &S, &tau, &pp.V);
+        let pok = KvacPLEd25519::pok(&witness, &C, &pp.R, &pp.X, &Yj, &S, &tau, &pp.V);
 
         PreCredential {
             tau,
@@ -142,11 +132,11 @@ impl KvacPLBLS12 {
 
     pub fn obtain_cred(pp: &PublicParams, pre_cred: &PreCredential, S: &[ScalarField]) -> Credential {
         // C <-- y * f_S(v) G
-        let f = Dvsc::construct_f(&S);
-        let C_recalculated = Dvsc::evaluate_f_at_secret_point(&f.coeffs, &pre_cred.Yj);
+        let f = polynomial_utils_ed25519::construct_f(&S);
+        let C_recalculated = polynomial_utils_ed25519::evaluate_f_at_secret_point(&f.coeffs, &pre_cred.Yj);
 
         // Check PoK
-        let result = KvacPLBLS12::pok_verify(&pre_cred.pok, &pp.V, &C_recalculated, &pp.R, &pp.X, &pre_cred.Yj, &S, &pre_cred.tau);
+        let result = KvacPLEd25519::pok_verify(&pre_cred.pok, &pp.V, &C_recalculated, &pp.R, &pp.X, &pre_cred.Yj, &S, &pre_cred.tau);
         assert!(result);
         // println!("PoK result: {:?}", result);
 
@@ -163,10 +153,10 @@ impl KvacPLBLS12 {
         let miu = ScalarField::rand(&mut rng);
 
         // S\D
-        let S_without_D = Dvsc::difference(S, D);
+        let S_without_D = polynomial_utils_ed25519::difference(S, D);
         // f_{S\D}
-        let f = Dvsc::construct_f(&S_without_D);
-        let yf = Dvsc::evaluate_f_at_secret_point(&f.coeffs, &cred.Yj);
+        let f = polynomial_utils_ed25519::construct_f(&S_without_D);
+        let yf = polynomial_utils_ed25519::evaluate_f_at_secret_point(&f.coeffs, &cred.Yj);
 
         // W <-- miu_y_f
         let W = yf.mul(miu);
@@ -183,10 +173,10 @@ impl KvacPLBLS12 {
     pub fn verify(pp: &PublicParams, show: &Show, D: &[ScalarField], isk: &SecretKeys ) -> bool {
         // xWf_D(v) == tau_prime
         // f_D(x)
-        // let f_D = Dvsc::construct_f(D);
+        // let f_D = polynomial_utils_ed25519::construct_f(D);
         // f_D(v)
         // let f_D_evaluated_at_v = f_D.evaluate(&isk.v);
-        let f_D_evaluated_at_v = Dvsc::evaluate_f_at_v_without_interpolation(&D, &isk.v);
+        let f_D_evaluated_at_v = polynomial_utils_ed25519::evaluate_f_at_v_without_interpolation(&D, &isk.v);
         // x.f_D(v)
         let x_f_D_evaluated_at_v = &isk.x * &f_D_evaluated_at_v;
         // W.x.f_D(v)
@@ -197,10 +187,10 @@ impl KvacPLBLS12 {
         // let xWf_D_evaluated_at_v = Wf_D_evaluated_at_v.mul(&isk.x);
 
         // (xWf_D(v) == tau_prime) && (tau_prime != 0G)
-        xWf_D_evaluated_at_v.eq(&show.tau_prime) && (!show.tau_prime.eq(&G1::zero()))
+        xWf_D_evaluated_at_v.eq(&show.tau_prime) && (!show.tau_prime.eq(&G::zero()))
     }
 
-    pub fn pok (witness: &Witness, C: &G1, R: &G1, X:&G1, Yi: &[G1], S: &[ScalarField], tau: &G1, V: &G1) -> PoK{
+    pub fn pok (witness: &Witness, C: &G, R: &G, X:&G, Yi: &[G], S: &[ScalarField], tau: &G, V: &G) -> PoK{
         let mut rng = ark_std::rand::thread_rng();
         let r_x = ScalarField::rand(&mut rng);
         let r_v = ScalarField::rand(&mut rng);
@@ -220,7 +210,7 @@ impl KvacPLBLS12 {
         let mut Yj = (&Yi[0..s_size]).to_vec();
         hash_input_points.append(&mut Yj);
 
-        let c = KvacPLBLS12::hash_to_fr(&hash_input_points, &S);
+        let c = KvacPLEd25519::hash_to_fr(&hash_input_points, &S);
 
         let s_x = &r_x + &((&c)*(&witness.x));
         let s_v = &r_v + &((&c)*(&witness.v));
@@ -232,7 +222,7 @@ impl KvacPLBLS12 {
         }
     }
 
-    pub fn pok_verify(pok: &PoK, V: &G1, C: &G1, R: &G1, X: &G1, Yj: &[G1], S: &[ScalarField], tau: &G1) -> bool {
+    pub fn pok_verify(pok: &PoK, V: &G, C: &G, R: &G, X: &G, Yj: &[G], S: &[ScalarField], tau: &G) -> bool {
         let a1 = C.mul(&pok.s_x).sub(&tau.mul(&pok.c));
         let a2 = R.mul(&pok.s_x).sub(&X.mul(&pok.c));
 
@@ -251,12 +241,12 @@ impl KvacPLBLS12 {
         let mut Yj_s_slice = (&Yj[0..s_size]).to_vec();
         hash_input_points.append(&mut Yj_s_slice);
 
-        let c_verifier = KvacPLBLS12::hash_to_fr(&hash_input_points, &S);
+        let c_verifier = KvacPLEd25519::hash_to_fr(&hash_input_points, &S);
 
         pok.c == c_verifier
     }
 
-    pub fn hash_to_fr(points: &[G1Projective], scalar_fields: &[ScalarField]) -> Fr {
+    pub fn hash_to_fr(points: &[EdwardsProjective], scalar_fields: &[ScalarField]) -> Fr {
         let mut hasher = Sha256::new();
 
         // Serialize each point and feed it to the hash
@@ -372,40 +362,52 @@ impl KvacPLBLS12 {
 }
 
 
+
+
+
 #[cfg(test)]
-mod spmaceq_mac_tests {
+mod kvac_pairing_less_ed25519_tests {
     use std::ops::Mul;
-    use ark_bls12_381::FrConfig;
+    use ark_ed25519::FrConfig;
     use ark_ec::PrimeGroup;
     use ark_ff::{Fp256, MontBackend};
     use ark_poly::Polynomial;
     use ark_std::UniformRand;
-    use crate::protocols::dvsc::Dvsc;
-    use crate::protocols::kvac_pairing_less_bls12_381_g1::KvacPLBLS12;
-    use crate::protocols::kvac_pairing_less_bls12_381_g1::ScalarField;
-    use crate::protocols::kvac_pairing_less_bls12_381_g1::G1;
+    use crate::protocols::kvac_pairing_less_ed25519::{KvacPLEd25519, ScalarField};
+    use crate::protocols::kvac_pairing_less_ed25519::G;
+    use crate::protocols::polynomial_utils_ed25519;
+
+
+    #[test]
+    pub fn test_ed25519_operations() {
+        let mut rng = ark_std::rand::thread_rng();
+        let r = ScalarField::rand(&mut rng);
+
+        let generator = G::generator();
+        let rG = generator.mul(r);
+    }
 
     #[test]
     fn test_kvac_full_flow_test() {
         // 0. key gens
-        let isk = KvacPLBLS12::gen_isk();
-        let pp = KvacPLBLS12::gen_public_params(&isk);
+        let isk = KvacPLEd25519::gen_isk();
+        let pp = KvacPLEd25519::gen_public_params(&isk);
 
         // attribute sets
         let S = prepare_set_S(20);
         let D: Vec<ScalarField> = S.iter().take(8).cloned().collect();
 
         // 1. KVAC.issue_cred(pp, S, isk, ipar)
-        let pre_cred = KvacPLBLS12::issue_cred(&pp, &S, &isk);
+        let pre_cred = KvacPLEd25519::issue_cred(&pp, &S, &isk);
 
         // 2. KVAC.obtain_cred(pp, PreCred, S, ipar)
-        let cred = KvacPLBLS12::obtain_cred(&pp, &pre_cred, &S);
+        let cred = KvacPLEd25519::obtain_cred(&pp, &pre_cred, &S);
 
         // 3. KVAC.show_cred(pp, Cred, S, D)
-        let show = KvacPLBLS12::show_cred(&pp, &cred, &S, &D);
+        let show = KvacPLEd25519::show_cred(&pp, &cred, &S, &D);
 
         // 4. KVAC.verify(pp, Show, D, isk)
-        let result = KvacPLBLS12::verify(&pp, &show, &D, &isk);
+        let result = KvacPLEd25519::verify(&pp, &show, &D, &isk);
 
         assert_eq!(result, true);
     }
@@ -415,8 +417,8 @@ mod spmaceq_mac_tests {
         let s = vec![ScalarField::from(2u64), ScalarField::from(10u64), ScalarField::from(3u64)];
         let s_permuted = vec![ScalarField::from(3u64), ScalarField::from(10u64), ScalarField::from(2u64)];
 
-        let f1 = Dvsc::construct_f(&s);
-        let f2 = Dvsc::construct_f(&s_permuted);
+        let f1 = polynomial_utils_ed25519::construct_f(&s);
+        let f2 = polynomial_utils_ed25519::construct_f(&s_permuted);
 
         assert_eq!(f1.coeffs, f2.coeffs);
     }
@@ -428,12 +430,12 @@ mod spmaceq_mac_tests {
         let mut rng = ark_std::rand::thread_rng();
         let v = ScalarField::rand(&mut rng);
 
-        let fv1 = Dvsc::evaluate_f_at_v_without_interpolation(&s, &v);
-        let fv2 = Dvsc::evaluate_f_at_v_without_interpolation(&s_permuted, &v);
+        let fv1 = polynomial_utils_ed25519::evaluate_f_at_v_without_interpolation(&s, &v);
+        let fv2 = polynomial_utils_ed25519::evaluate_f_at_v_without_interpolation(&s_permuted, &v);
 
         assert_eq!(fv1, fv2);
 
-        let f_S = Dvsc::construct_f(&s);
+        let f_S = polynomial_utils_ed25519::construct_f(&s);
         let f_S_evaluate_at_v = f_S.evaluate(&v);
 
         assert_eq!(fv1, f_S_evaluate_at_v);
@@ -441,29 +443,29 @@ mod spmaceq_mac_tests {
 
     #[test]
     fn test_key_gens() {
-        let keys = KvacPLBLS12::gen_isk();
-        let public_params = KvacPLBLS12::gen_public_params(&keys);
+        let keys = KvacPLEd25519::gen_isk();
+        let public_params = KvacPLEd25519::gen_public_params(&keys);
     }
 
     #[test]
     fn test_evaluations() {
-        let secret_keys = KvacPLBLS12::gen_isk();
-        let public_params = KvacPLBLS12::gen_public_params(&secret_keys);
+        let secret_keys = KvacPLEd25519::gen_isk();
+        let public_params = KvacPLEd25519::gen_public_params(&secret_keys);
 
         let S = prepare_set_S(20);
 
-        let pre_cred = KvacPLBLS12::issue_cred(&public_params, &S, &secret_keys);
+        let pre_cred = KvacPLEd25519::issue_cred(&public_params, &S, &secret_keys);
 
         // expected C
         let mut rng = ark_std::rand::thread_rng();
         let y = ScalarField::rand(&mut rng);
-        let f_S = Dvsc::construct_f(&S);
+        let f_S = polynomial_utils_ed25519::construct_f(&S);
         let f_S_evaluated_at_v = f_S.evaluate(&secret_keys.v);
-        let G = G1::generator();
+        let Gen = G::generator();
         let x: Fp256<MontBackend<FrConfig, 4>> = y * f_S_evaluated_at_v;
-        let C_expected = G.mul(x);
+        let C_expected = Gen.mul(x);
 
-        let C = Dvsc::evaluate_f_at_secret_point(&f_S.coeffs, &pre_cred.Yj);
+        let C = polynomial_utils_ed25519::evaluate_f_at_secret_point(&f_S.coeffs, &pre_cred.Yj);
 
         // bad test
         //assert_eq!(C, C_expected)
@@ -471,13 +473,13 @@ mod spmaceq_mac_tests {
 
     #[test]
     fn test_Kvac_flow() {
-        let secret_keys = KvacPLBLS12::gen_isk();
-        let public_params = KvacPLBLS12::gen_public_params(&secret_keys);
+        let secret_keys = KvacPLEd25519::gen_isk();
+        let public_params = KvacPLEd25519::gen_public_params(&secret_keys);
 
         let S = prepare_set_S(20);
 
-        let pre_cred = KvacPLBLS12::issue_cred(&public_params, &S, &secret_keys);
-        let credential = KvacPLBLS12::obtain_cred(&public_params, &pre_cred, &S);
+        let pre_cred = KvacPLEd25519::issue_cred(&public_params, &S, &secret_keys);
+        let credential = KvacPLEd25519::obtain_cred(&public_params, &pre_cred, &S);
     }
 
     // this prepares a random set S of attributes for testing purposes

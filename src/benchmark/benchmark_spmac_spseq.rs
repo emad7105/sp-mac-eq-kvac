@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 use ark_bls12_381::{Fr as ScalarField, G1Projective as G1, G2Projective as G2, Bls12_381, G1Projective, Fr};
-use ark_ec::Group;
+use ark_ec::PrimeGroup;
 use std::ops::Mul;
 use ark_std::UniformRand;
 use crate::protocols::spmac_bls12_381::SpMacEq;

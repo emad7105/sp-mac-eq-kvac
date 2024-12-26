@@ -1,7 +1,7 @@
 use ark_bls12_381::{Fr as ScalarField, G1Projective as G1, G2Projective as G2, Bls12_381, G1Projective, G2Projective, Fr, FrConfig};
 use std::ops::{Add, AddAssign, Mul, Sub};
 use ark_ec::pairing::Pairing;
-use ark_ec::{CurveGroup, Group};
+use ark_ec::{CurveGroup, PrimeGroup};
 use ark_ff::{BigInteger, Field, Fp, Fp256, MontBackend, PrimeField};
 use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial, Polynomial};
 use rand::{CryptoRng, Rng};
@@ -393,7 +393,7 @@ mod spmaceq_mac_tests {
     use crate::protocols::kvac_pairing_based::KvacPB;
     use ark_std::UniformRand;
     use ark_bls12_381::{Fr as ScalarField, G1Projective as G1, G2Projective as G2, Bls12_381, G1Projective, Fr, FrConfig};
-    use ark_ec::Group;
+    use ark_ec::PrimeGroup;
     use sha2::Sha256;
     use sha2::Digest;
 

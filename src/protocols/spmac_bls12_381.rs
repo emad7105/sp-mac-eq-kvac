@@ -1,7 +1,7 @@
 use std::ops::{Add, Mul};
 use ark_bls12_381::{Fr as ScalarField, G1Projective as G1, G2Projective as G2, Bls12_381, G1Projective, Fr};
 use ark_std::UniformRand;
-use ark_ec::Group;
+use ark_ec::PrimeGroup;
 use ark_std::Zero;
 use ark_ff::fields::Field;
 use ark_ec::pairing::{Pairing};
