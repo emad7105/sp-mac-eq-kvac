@@ -14,11 +14,11 @@ pub fn start_benchmarking() {
     println!("\n\nSP.Mac:\n");
     bench_sp_mac_all();
 
-    // println!("\n\nSPS.EQ.Verify:\n");
-    // bench_sps_eq_verify_all();
-    //
-    // println!("\n\nSP.Mac.Verify:\n");
-    // bench_sp_mac_verify_all();
+    println!("\n\nSPS.EQ.Verify:\n");
+    bench_sps_eq_verify_all();
+
+    println!("\n\nSP.Mac.Verify:\n");
+    bench_sp_mac_verify_all();
 
 }
 
@@ -93,16 +93,16 @@ fn bench_sps_eq_sign_all() {
 
 fn bench_sps_eq_verify_all() {
     let mut l = 2;
-    // bench_sps_eq_verify(l, "2^1");
-    //
-    // l = 8;
-    // bench_sps_eq_verify(l, "2^3");
-    //
-    // l = 32;
-    // bench_sps_eq_verify(l, "2^5");
-    //
-    // l = 128;
-    // bench_sps_eq_verify(l, "2^7");
+    bench_sps_eq_verify(l, "2^1");
+
+    l = 8;
+    bench_sps_eq_verify(l, "2^3");
+
+    l = 32;
+    bench_sps_eq_verify(l, "2^5");
+
+    l = 128;
+    bench_sps_eq_verify(l, "2^7");
 
     l = 512;
     bench_sps_eq_verify(l, "2^9");
@@ -119,7 +119,7 @@ fn bench_sp_mac(l: usize, l_desc: &str) {
     let mut rng = ark_std::test_rng();
     let messages = vec![G1::generator().mul(ScalarField::rand(&mut rng)); l];
 
-    let times = 200;
+    let times = 100;
 
     let mut total_time = Duration::new(0, 0);
     for i in 0..times {
@@ -146,7 +146,7 @@ fn bench_sp_mac_verify(l: usize, l_desc: &str) {
     let mut rng = ark_std::test_rng();
     let messages = vec![G1::generator().mul(ScalarField::rand(&mut rng)); l];
 
-    let times = 200;
+    let times = 100;
 
     let mac = SpMacEq::mac_test(&key_pair.sk, &messages);
 
@@ -176,7 +176,7 @@ fn bench_sps_eq_sign(l: usize, l_desc: &str) {
     let mut rng = ark_std::test_rng();
     let messages = vec![G1::generator().mul(ScalarField::rand(&mut rng)); l];
 
-    let times = 200;
+    let times = 100;
 
     let mut total_time = Duration::new(0, 0);
     for i in 0..times {
@@ -202,7 +202,7 @@ fn bench_sps_eq_verify(l: usize, l_desc: &str) {
     let mut rng = ark_std::test_rng();
     let messages = vec![G1::generator().mul(ScalarField::rand(&mut rng)); l];
 
-    let times = 200;
+    let times = 100;
 
     let sig = SpsEqSignature::sign_test(&key_pair.sk, &messages);
 
