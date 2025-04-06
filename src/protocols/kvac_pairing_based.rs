@@ -23,14 +23,16 @@ pub struct KvacPB {}
 pub struct KvacPBSecretKeys {
     sk_MEQ_x1: ScalarField,
     sk_MEQ_x2: ScalarField,
+    r: ScalarField,
 
     sk_DVSC: DvscSk,
 }
 
 pub struct KvacPBPublicParams {
-    ipar_MEQ_I: G1,
-    ipar_MEQ_X1: G1,
-    ipar_MEQ_X2: G1,
+    // ipar_MEQ_I: G1,
+    // ipar_MEQ_X1: G1,
+    // ipar_MEQ_X2: G1,
+    ipar_MEQ_X: G1,
 
     setup_pp_DVSC: DvscSetupParams,
     ipar_DVSC: DvscPublicParam,
@@ -39,7 +41,8 @@ pub struct KvacPBPublicParams {
 pub struct Witness {
     a_minus_1: ScalarField,
     x1: ScalarField,
-    x2: ScalarField
+    x2: ScalarField,
+    r: ScalarField,
 }
 
 pub struct PoK {
@@ -47,6 +50,7 @@ pub struct PoK {
     s_a_minus_1: ScalarField,
     s_x1: ScalarField,
     s_x2: ScalarField,
+    s_r: ScalarField,
 }
 
 pub struct PreCredential {
@@ -77,22 +81,30 @@ impl KvacPB {
 
         let mut rng = ark_std::rand::thread_rng(); // todo
         let r = ScalarField::rand(&mut rng);
+
         let G1_gen = G1::generator();
-        let I = G1_gen.mul(r);
-        let X1 = I.mul(x1);
-        let X2 = I.mul(x2);
+        // let I = G1_gen.mul(r);
+        // let X1 = I.mul(x1);
+        // let X2 = I.mul(x2);
+        // X = x1.G1 + x2.G1' + rG1"
+        let x1G1 = G1_gen.mul(x1);
+        let x2G1_prime = dvsc_setup_pp.G_prime.mul(x2);
+        let rG1_double_prime = dvsc_setup_pp.G_double_prime.mul(r);
+        let X = x1G1 + x2G1_prime + rG1_double_prime;
 
         let isk = KvacPBSecretKeys {
             sk_MEQ_x1: x1.clone(),
             sk_MEQ_x2: x2.clone(),
+            r: r.clone(),
 
             sk_DVSC: dvsc_sk,
         };
 
         let ipar = KvacPBPublicParams {
-            ipar_MEQ_I: I,
-            ipar_MEQ_X1: X1,
-            ipar_MEQ_X2: X2,
+            // ipar_MEQ_I: I,
+            // ipar_MEQ_X1: X1,
+            // ipar_MEQ_X2: X2,
+            ipar_MEQ_X: X,
 
             setup_pp_DVSC: dvsc_setup_pp,
             ipar_DVSC: dvsc_ipar_pp
@@ -120,10 +132,23 @@ impl KvacPB {
             x1: isk.sk_MEQ_x1.clone(),
             x2: isk.sk_MEQ_x2.clone(),
             a_minus_1: a.inverse().expect("inverse a failed"),
+            r: isk.r.clone(),
         };
+        //
+        // let pok = KvacPB::pok(&witness, &S, &pp.ipar_MEQ_X1, &pp.ipar_MEQ_X2,
+        //                       &tau.R, &tau.T, &pp.ipar_MEQ_I, &C.fs_evaluated_at_v_G, &C.G_prime);
 
-        let pok = KvacPB::pok(&witness, &S, &pp.ipar_MEQ_X1, &pp.ipar_MEQ_X2,
-                              &tau.R, &tau.T, &pp.ipar_MEQ_I, &C.fs_evaluated_at_v_G, &C.G_prime);
+        let pok = KvacPB::pok(
+            &witness,
+            &S,
+            &pp.ipar_MEQ_X,
+            &tau.R,
+            &tau.T,
+            &C.fs_evaluated_at_v_G,
+            &C.G_prime,
+            &pp.setup_pp_DVSC.G_prime,
+            &&pp.setup_pp_DVSC.G_double_prime
+        );
 
         // 6. PreCred := (tau, pok)
         PreCredential {
@@ -138,8 +163,22 @@ impl KvacPB {
         let C = Dvsc::commit(&pp.setup_pp_DVSC, &pp.ipar_DVSC, &S);
 
         // 11: Pok checking
-        let result = KvacPB::pok_verify(&pre_cred.pok, &S, &pp.ipar_MEQ_X1, &pp.ipar_MEQ_X2,
-                           &pre_cred.tau.R, &pre_cred.tau.T, &pp.ipar_MEQ_I, &C.fs_evaluated_at_v_G, &C.G_prime);
+        // let result = KvacPB::pok_verify(&pre_cred.pok, &S, &pp.ipar_MEQ_X1, &pp.ipar_MEQ_X2,
+        //                    &pre_cred.tau.R, &pre_cred.tau.T, &pp.ipar_MEQ_I, &C.fs_evaluated_at_v_G, &C.G_prime);
+
+
+
+        let result = KvacPB::pok_verify(
+            &pre_cred.pok,
+            &S,
+            &pp.ipar_MEQ_X,
+            &pre_cred.tau.R,
+            &pre_cred.tau.T,
+            &C.fs_evaluated_at_v_G,
+            &C.G_prime,
+            &pp.setup_pp_DVSC.G_prime,
+            &pp.setup_pp_DVSC.G_double_prime,
+        );
         assert!(result);
         //println!("PoK result: {:?}", result);
 
@@ -194,45 +233,67 @@ impl KvacPB {
         SpMacEq::verify(&spmac_sks, &show.tau_prime, &C_prime)
     }
 
-    pub fn pok(witness: &Witness, S: &[ScalarField], X1: &G1, X2: &G1, R: &G1, T: &G2, I: &G1, C1:&G1, C2:&G1 ) -> PoK {
+    pub fn pok(witness: &Witness, S: &[ScalarField], X: &G1, R: &G1, T: &G2, C1:&G1, C2:&G1, G_prime: &G1, G_double_prime:&G1) -> PoK {
         let mut rng = ark_std::rand::thread_rng(); // todo
         let r_a_minus_one = ScalarField::rand(&mut rng);
         let r_x1 = ScalarField::rand(&mut rng);
         let r_x2 = ScalarField::rand(&mut rng);
+        let r_r = ScalarField::rand(&mut rng);
 
-        let a1 = I.mul(&r_x1);
-        let a2 = I.mul(&r_x2);
-        let a3 = G2::generator().mul(&r_a_minus_one);
-        let rx1C1 = C1.mul(&r_x1);
-        let rx2C2 = C2.mul(&r_x2);
-        let ra1R = R.mul(r_a_minus_one);
-        let rx1C1_plus_rx2C2 = rx1C1.add(rx2C2);
-        let a4 = rx1C1_plus_rx2C2.sub(ra1R);
+        // let a1 = I.mul(&r_x1);
+        // let a2 = I.mul(&r_x2);
+        // let a3 = G2::generator().mul(&r_a_minus_one);
+        // let rx1C1 = C1.mul(&r_x1);
+        // let rx2C2 = C2.mul(&r_x2);
+        // let ra1R = R.mul(r_a_minus_one);
+        // let rx1C1_plus_rx2C2 = rx1C1.add(rx2C2);
+        // let a4 = rx1C1_plus_rx2C2.sub(ra1R);
+        let A1 = G1::generator().mul(&r_x1) + G_prime.mul(&r_x2) + G_double_prime.mul(&r_r);
+        let A2 = G2::generator().mul(&r_a_minus_one);
+        let A3 = C1.mul(&r_x1) + C2.mul(&r_x2) - R.mul(&r_a_minus_one);
 
-        let hash_input_points_G1 = vec![a1, a2, a4, *X1, *X2, *I, *C1, *C2, *R];
-        let hash_input_points_G2 = vec![a3, *T];
+        // let hash_input_points_G1 = vec![a1, a2, a4, *X1, *X2, *I, *C1, *C2, *R];
+        // let hash_input_points_G2 = vec![a3, *T];
+        let hash_input_points_G1 = vec![A1, A3, *X, *C1, *C2, *R];
+        let hash_input_points_G2 = vec![A2, *T];
         let c = KvacPB::hash_to_fr(&hash_input_points_G1, &S,  &hash_input_points_G2);
+
+        // let s_a_minus_1 = &r_a_minus_one + &((&c)*(&witness.a_minus_1));
+        // let s_x1 = &r_x1 + &((&c)*(&witness.x1));
+        // let s_x2 = &r_x2 + &((&c)*(&witness.x2));
 
         let s_a_minus_1 = &r_a_minus_one + &((&c)*(&witness.a_minus_1));
         let s_x1 = &r_x1 + &((&c)*(&witness.x1));
         let s_x2 = &r_x2 + &((&c)*(&witness.x2));
+        let s_r = &r_r + &((&c)*(&witness.r));
 
         PoK{
             c: c,
             s_a_minus_1: s_a_minus_1,
             s_x1: s_x1,
             s_x2: s_x2,
+            s_r: s_r,
         }
     }
 
-    pub fn pok_verify(pok: &PoK, S: &[ScalarField], X1: &G1, X2: &G1, R: &G1, T: &G2, I: &G1, C1:&G1, C2:&G1 ) -> bool {
-        let a1 = I.mul(&pok.s_x1).sub(&X1.mul(&pok.c));
-        let a2 = I.mul(&pok.s_x2).sub(&X2.mul(&pok.c));
-        let a3 = G2::generator().mul(&pok.s_a_minus_1).sub(&T.mul(&pok.c));
-        let a4 = C1.mul(&pok.s_x1).add(&C2.mul(&pok.s_x2)).sub(&R.mul(&pok.s_a_minus_1));
+    pub fn pok_verify(pok: &PoK, S: &[ScalarField], X: &G1, R: &G1, T: &G2, C1:&G1, C2:&G1, G_prime: &G1, G_double_prime:&G1) -> bool {
+        // let a1 = I.mul(&pok.s_x1).sub(&X1.mul(&pok.c));
+        // let a2 = I.mul(&pok.s_x2).sub(&X2.mul(&pok.c));
+        // let a3 = G2::generator().mul(&pok.s_a_minus_1).sub(&T.mul(&pok.c));
+        // let a4 = C1.mul(&pok.s_x1).add(&C2.mul(&pok.s_x2)).sub(&R.mul(&pok.s_a_minus_1));
+        let mut A1 = G1::generator().mul(&pok.s_x1) + G_prime.mul(&pok.s_x2) + G_double_prime.mul(&pok.s_r);
+        let mut A2 = G2::generator().mul(&pok.s_a_minus_1);
+        let A3 = C1.mul(&pok.s_x1) + C2.mul(&pok.s_x2) - R.mul(&pok.s_a_minus_1);
 
-        let hash_input_points_G1 = vec![a1, a2, a4, *X1, *X2, *I, *C1, *C2, *R];
-        let hash_input_points_G2 = vec![a3, *T];
+        A1 = A1 - X.mul(&pok.c);
+        A2 = A2 - T.mul(&pok.c);
+
+        // let hash_input_points_G1 = vec![A1, A3, *X, *C1, *C2, *R];
+        // let hash_input_points_G2 = vec![A2, *T];
+        // let c = KvacPB::hash_to_fr(&hash_input_points_G1, &S,  &hash_input_points_G2);
+
+        let hash_input_points_G1 = vec![A1, A3, *X, *C1, *C2, *R];
+        let hash_input_points_G2 = vec![A2, *T];
         let c_verifier = KvacPB::hash_to_fr(&hash_input_points_G1, &S, &hash_input_points_G2);
 
         pok.c == c_verifier

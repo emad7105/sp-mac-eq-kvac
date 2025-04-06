@@ -30,7 +30,8 @@ pub struct PoK {
 
 pub struct DvscSetupParams {
     G: G1,
-    G_prime: G1,
+    pub G_prime: G1,
+    pub G_double_prime: G1,
 }
 
 pub struct DvscSk {
@@ -53,10 +54,12 @@ impl Dvsc{
         let G = G1::generator();
 
         let mut rng = ark_std::rand::thread_rng(); // todo
-        let r = ScalarField::rand(&mut rng);
-        let G_prime = G.mul(r);
+        let r1 = ScalarField::rand(&mut rng);
+        let r2 = ScalarField::rand(&mut rng);
+        let G_prime = G.mul(r1);
+        let G_double_prime = G.mul(r2);
 
-        DvscSetupParams {G, G_prime}
+        DvscSetupParams {G: G, G_prime: G_prime, G_double_prime: G_double_prime}
     }
 
     pub fn key_gen(pp: &DvscSetupParams, t: usize) -> (DvscSk, DvscPublicParam){
