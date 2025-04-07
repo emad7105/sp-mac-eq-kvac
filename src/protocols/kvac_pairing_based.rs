@@ -14,7 +14,7 @@ use std::future::poll_fn;
 use ark_serialize::CanonicalSerialize;
 use sha2::{Sha256,Digest};
 use crate::protocols::dvsc;
-use crate::protocols::dvsc::{Commitment, Dvsc, DvscPublicParam, DvscSetupParams, DvscSk};
+use crate::protocols::dvsc::{Commitment, Dvsc, DvscPublicParam, DvscSetupParams, DvscSk, OpenSubset};
 use crate::protocols::spmac_bls12_381::SpMacEq;
 
 
@@ -65,7 +65,8 @@ pub struct Credential {
 
 pub struct Show {
     tau_prime: SpMacEq,
-    W: Commitment
+    C_prime: Commitment,
+    W: OpenSubset,
 }
 
 impl KvacPB {
@@ -205,32 +206,39 @@ impl KvacPB {
         //     G_prime: C2_prime,
         // };
 
+        let C = Dvsc::commit(&pp.setup_pp_DVSC, &pp.ipar_DVSC, &S);
+        let C_prime = Dvsc::randomize(&pp.setup_pp_DVSC, &pp.ipar_DVSC, &C, &miu);
+
+
         // 4. DVSC.OpenSubset (miu, S, D) --> W
         let W = Dvsc::open_subset(&pp.setup_pp_DVSC, &pp.ipar_DVSC, &miu, &S, &D);
 
         // 5. Show := (tau_prime, W)
         Show {
-           tau_prime, W,
+            tau_prime: tau_prime,
+            W: W,
+            C_prime: C_prime,
         }
     }
 
     pub fn verify(pp: &KvacPBPublicParams, show: &Show, D:&[ScalarField], isk: &KvacPBSecretKeys) -> bool {
         // 7. parsing isk
         // 8. parsing show
-        let W1 = show.W.fs_evaluated_at_v_G;
-        let W2 = show.W.G_prime;
+        let W = &show.W;
+        // let W2 = show.W.G_prime;
 
         // 9. C_prime = (f_D(v)W1, W2)
         // let f_D = Dvsc::construct_f(D);
         // let f_D_evaluated_at_v = f_D.evaluate(&isk.sk_DVSC.sk);
-        let f_D_evaluated_at_v = Dvsc::evaluate_f_at_v_without_interpolation(&D, &isk.sk_DVSC.sk);
-
-        let f_D_evaluated_at_v_W1 = W1.mul(f_D_evaluated_at_v);
-        let C_prime = vec![f_D_evaluated_at_v_W1, W2];
+        // let f_D_evaluated_at_v = Dvsc::evaluate_f_at_v_without_interpolation(&D, &isk.sk_DVSC.sk);
+        // let f_D_evaluated_at_v_W1 = W.mul(f_D_evaluated_at_v);
+        // let C_prime = vec![f_D_evaluated_at_v_W1, W2];
 
         // 10. MEQ.verify(sk_MEQ, C_prime, tau_prime)
         let spmac_sks = vec![isk.sk_MEQ_x1, isk.sk_MEQ_x2];
-        SpMacEq::verify(&spmac_sks, &show.tau_prime, &C_prime)
+        let C_prime = vec![show.C_prime.fs_evaluated_at_v_G, show.C_prime.G_prime];
+        SpMacEq::verify(&spmac_sks, &show.tau_prime, &C_prime) &&
+            Dvsc::verify_subset(&pp.setup_pp_DVSC, &pp.ipar_DVSC, &isk.sk_DVSC, &show.C_prime, W, D)
     }
 
     pub fn pok(witness: &Witness, S: &[ScalarField], X: &G1, R: &G1, T: &G2, C1:&G1, C2:&G1, G_prime: &G1, G_double_prime:&G1) -> PoK {
@@ -434,11 +442,11 @@ impl KvacPB {
         let size_fs_evaluated = buffer.len();
         buffer.clear();
 
-        show.W.G_prime.serialize_compressed(&mut buffer).unwrap();
-        let size_g_prime = buffer.len();
-        buffer.clear();
+        // show.W.G_prime.serialize_compressed(&mut buffer).unwrap();
+        // let size_g_prime = buffer.len();
+        // buffer.clear();
 
-        let size_commitment = size_fs_evaluated + size_g_prime;
+        let size_commitment = size_fs_evaluated; //+ size_g_prime;
 
         // Total size
         size_tau_prime + size_commitment

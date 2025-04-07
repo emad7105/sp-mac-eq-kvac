@@ -48,6 +48,10 @@ pub struct Commitment {
     pub G_prime: G1,
 }
 
+pub struct OpenSubset {
+    pub fs_evaluated_at_v_G: G1, // fs_evaluated_at_v_G
+}
+
 impl Dvsc{
 
     pub fn setup() -> DvscSetupParams {
@@ -223,29 +227,38 @@ impl Dvsc{
         }
     }
 
-    pub fn open_subset(pp: &DvscSetupParams, ipar: &DvscPublicParam, miu: &ScalarField, S: &[ScalarField], D: &[ScalarField]) -> Commitment {
+    /*
+    * used for re-randing opensubset output (W)
+    */
+    pub fn randomize_w(pp: &DvscSetupParams, ipar: &DvscPublicParam, os: &OpenSubset, miu: &ScalarField) -> OpenSubset {
+        OpenSubset {
+            fs_evaluated_at_v_G: os.fs_evaluated_at_v_G.mul(miu)
+        }
+    }
+
+    pub fn open_subset(pp: &DvscSetupParams, ipar: &DvscPublicParam, miu: &ScalarField, S: &[ScalarField], D: &[ScalarField]) -> OpenSubset {
         let S_bar_D = Dvsc::difference(&S, &D);
 
         let f_S_bar_D = Dvsc::construct_f(&S_bar_D);
         let f_S_bar_D_evaluated_at_v = Dvsc::evaluate_f_at_secret_point(&f_S_bar_D.coeffs, &ipar.Vj);
 
-        let C = Commitment{
+        let os = OpenSubset{
             fs_evaluated_at_v_G: f_S_bar_D_evaluated_at_v,
-            G_prime: pp.G_prime.clone(),
+            // G_prime: pp.G_prime.clone(),
         };
 
-        Dvsc::randomize(&pp, &ipar, &C, &miu)
+        Dvsc::randomize_w(&pp, &ipar, &os, &miu)
     }
 
 
-    pub fn verify_subset(pp: &DvscSetupParams, ipar: &DvscPublicParam, sk: &DvscSk, C_prime: &Commitment, W: &Commitment, D: &[ScalarField]) -> bool {
+    pub fn verify_subset(pp: &DvscSetupParams, ipar: &DvscPublicParam, sk: &DvscSk, C_prime: &Commitment, W: &OpenSubset, D: &[ScalarField]) -> bool {
         // let f_D = Dvsc::construct_f(&D);
         // let f_D_evaluated_at_v = f_D.evaluate(&sk.sk);
         let f_D_evaluated_at_v = Dvsc::evaluate_f_at_v_without_interpolation(&D, &sk.sk);
 
         let WW2 = W.fs_evaluated_at_v_G.mul(f_D_evaluated_at_v);
 
-        WW2.eq(&C_prime.fs_evaluated_at_v_G) && W.G_prime.eq(&C_prime.G_prime)
+        WW2.eq(&C_prime.fs_evaluated_at_v_G) //&& W.G_prime.eq(&C_prime.G_prime)
     }
 }
 
