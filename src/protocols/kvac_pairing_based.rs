@@ -442,6 +442,14 @@ impl KvacPB {
         let size_fs_evaluated = buffer.len();
         buffer.clear();
 
+        show.C_prime.G_prime.serialize_compressed(&mut buffer).unwrap();
+        let size_c_prime_g_prim = buffer.len();
+        buffer.clear();
+
+        show.C_prime.fs_evaluated_at_v_G.serialize_compressed(&mut buffer).unwrap();
+        let size_c_prime_fs_evaluated_at_v_G = buffer.len();
+        buffer.clear();
+
         // show.W.G_prime.serialize_compressed(&mut buffer).unwrap();
         // let size_g_prime = buffer.len();
         // buffer.clear();
@@ -449,7 +457,7 @@ impl KvacPB {
         let size_commitment = size_fs_evaluated; //+ size_g_prime;
 
         // Total size
-        size_tau_prime + size_commitment
+        size_tau_prime + size_commitment + size_c_prime_g_prim + size_c_prime_fs_evaluated_at_v_G
     }
 
 }
